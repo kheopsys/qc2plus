@@ -1,0 +1,102 @@
+Tu es un développeur expert Python/SQL chargé de finaliser le framework 2QC+ de Data Quality Automation.
+
+## CONTEXTE
+2QC+ est un framework opensource Python (style dbt) pour l'automatisation du contrôle qualité des données avec 2 niveaux :
+- Level 1 : Règles métier explicites (contraintes intégrité, format, seuils statistiques)  
+- Level 2 : Détection intelligente ML (corrélations, patterns temporels, anomalies multivariées, distributions)
+
+## ARCHITECTURE CIBLE
+qc2plus/ ├── qc2plus/ │ ├── init.py │ ├── cli.py (CLI comme dbt) │ ├── core/ │ │ ├── project.py (gestion projet) │ │ ├── connection.py (multi-DB : PostgreSQL, Snowflake, BigQuery, Redshift) │ │ └── runner.py (orchestrateur principal) │ ├── level1/ │ │ ├── engine.py │ │ └── macros.py (SQL templates Jinja2) │ ├── level2/ │ │ ├── correlation.py │ │ ├── temporal.py │ │ ├── multivariate.py │ │ └── distribution.py │ ├── alerting/ │ │ └── alerts.py (Email, Slack, Teams) │ └── output/ │ └── persistence.py (tables pour Power BI) ├── setup.py └── requirements.txt
+
+
+## FONCTIONNALITÉS REQUISES
+
+### CLI (comme dbt)
+```bash
+qc2plus init my_project
+qc2plus run --models customers --level 1 --target prod
+qc2plus test-connection --target staging
+Configuration YAML par modèle
+yaml
+
+# models/customers.yml
+models:
+  - name: customers
+    qc2plus_tests:
+      level1:
+        - unique: {column_name: customer_id, severity: critical}
+        - email_format: {column_name: email, severity: medium}
+      level2:
+        correlation_analysis:
+          - variables: [daily_registrations, daily_activations]
+            expected_correlation: 0.8
+Multi-environnements (profiles.yml)
+yaml
+
+default:
+  target: dev
+  outputs:
+    dev: {type: postgresql, host: localhost, ...}
+    staging: {type: snowflake, account: xxx, ...}
+    prod: {type: bigquery, project: xxx, ...}
+Level 1 - Macros SQL adaptées par moteur
+* unique, not_null, foreign_key, email_format, future_date
+* statistical_threshold (seuils avec historique ±σ)
+* Adaptation SQL selon DB (regex, dates, intervals)
+Level 2 - Analyses ML
+* Corrélations : détection ruptures relations variables
+* Temporel : saisonnalité, déviations patterns
+* Multivariée : Isolation Forest, LOF
+* Distributions : anomalies par segments (géo, catégorie)
+Alerting multi-canaux
+* Email (SMTP, HTML formaté)
+* Slack (webhooks, rich cards)
+* Teams (webhooks)
+* Alertes individuelles (critical/high) + résumés
+Persistence Power BI
+3 tables auto-créées :
+* quality_test_results (détails tests)
+* quality_run_summary (KPIs globaux)
+* quality_anomalies (Level 2 détaillé)
+PROBLÈMES À CORRIGER
+Le code actuel a des coquilles et incomplétudes :
+1. Syntaxe Python cassée dans persistence.py
+2. Imports manquants
+3. Gestion d'erreurs incomplète
+4. Tests unitaires manquants
+5. Documentation code manquante
+TÂCHES DEMANDÉES
+1. CORRIGER LE CODE EXISTANT
+* Fixer toutes les erreurs de syntaxe Python
+* Compléter les imports manquants
+* Ajouter gestion d'erreurs robuste
+* Valider la cohérence entre modules
+2. COMPLÉTER LES FONCTIONNALITÉS MANQUANTES
+* Finir l'implémentation Level 2 (multivariate.py, distribution.py)
+* Compléter tous les adaptateurs DB
+* Finaliser le système d'alertes
+* Compléter la persistence
+3. PACKAGE PRÊT POUR PRODUCTION
+* setup.py complet avec dépendances
+* requirements.txt détaillé
+* Tests unitaires pytest
+* Documentation docstrings
+* README.md complet
+* Exemples d'usage
+4. STRUCTURE FICHIERS
+Produis le code complet et fonctionnel pour tous les fichiers :
+* Respecter l'architecture définie
+* Code production-ready
+* Gestion d'erreurs complète
+* Documentation incluse
+CONTRAINTES TECHNIQUES
+* Python 3.8+
+* SQLAlchemy pour DB
+* Jinja2 pour templates SQL
+* scikit-learn pour ML
+* pandas pour data processing
+* Compatible Docker
+* Package pip installable
+LIVRABLE ATTENDU
+Code source complet, testé et documenté pour un package Python opensource prêt à être publié sur PyPI.
+Commence par corriger les erreurs existantes puis complète toutes les fonctionnalités manquantes.
