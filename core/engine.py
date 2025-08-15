@@ -108,4 +108,163 @@ class Level1Engine:
             raise ValueError(f"Unknown test type: {test_type}")
         
         # Get database adapter for SQL dialect adaptation
-        db
+        db_adapter = None
+        if self.connection_manager:
+            db_adapter = self.connection_manager.get_db_adapter()
+        
+        # Prepare template context
+        context = {
+            'model_name': model_name,
+            'column_name': test_params.get('column_name'),
+            'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
+            **test_params
+        }
+        
+        # Render SQL template
+        template = self.jinja_env.from_string(SQL_MACROS[test_type])
+        sql = template.render(**context)
+        
+        # Apply database-specific adaptations
+        if db_adapter:
+            if 'email_format' in test_type or 'regex' in sql.lower():
+                sql = db_adapter.adapt_regex(sql)
+            sql = db_adapter.adapt_date_functions(sql)
+            sql = db_adapter.adapt_statistical_functions(sql)
+        
+        return sql
+    
+    def get_available_tests(self) -> List[str]:
+        """Get list of available test types"""
+        return list(SQL_MACROS.keys())
+    
+    def get_test_documentation(self, test_type: str) -> Dict[str, Any]:
+        """Get documentation for a specific test type"""
+        
+        test_docs = {
+            'unique': {
+                'description': 'Tests that a column contains only unique values',
+                'parameters': {
+                    'column_name': 'Column to test for uniqueness',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'unique': {
+                        'column_name': 'customer_id',
+                        'severity': 'critical'
+                    }
+                }
+            },
+            'not_null': {
+                'description': 'Tests that a column contains no null values',
+                'parameters': {
+                    'column_name': 'Column to test for null values',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'not_null': {
+                        'column_name': 'email',
+                        'severity': 'critical'
+                    }
+                }
+            },
+            'email_format': {
+                'description': 'Tests that email addresses follow valid format',
+                'parameters': {
+                    'column_name': 'Email column to validate',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'email_format': {
+                        'column_name': 'email',
+                        'severity': 'medium'
+                    }
+                }
+            },
+            'foreign_key': {
+                'description': 'Tests referential integrity between tables',
+                'parameters': {
+                    'column_name': 'Foreign key column',
+                    'reference_table': 'Referenced table name',
+                    'reference_column': 'Referenced column name',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'foreign_key': {
+                        'column_name': 'customer_id',
+                        'reference_table': 'customers',
+                        'reference_column': 'id',
+                        'severity': 'critical'
+                    }
+                }
+            },
+            'future_date': {
+                'description': 'Tests that date values are not in the future',
+                'parameters': {
+                    'column_name': 'Date column to test',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'future_date': {
+                        'column_name': 'created_at',
+                        'severity': 'medium'
+                    }
+                }
+            },
+            'statistical_threshold': {
+                'description': 'Tests statistical thresholds based on historical data',
+                'parameters': {
+                    'column_name': 'Column to analyze (optional for aggregations)',
+                    'metric': 'Metric to calculate (count, avg, sum, etc.)',
+                    'threshold_type': 'Type of threshold (absolute, relative)',
+                    'threshold_value': 'Threshold value or multiplier',
+                    'window_days': 'Historical window in days (default: 30)',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'statistical_threshold': {
+                        'metric': 'count',
+                        'threshold_type': 'relative',
+                        'threshold_value': 2.0,
+                        'window_days': 30,
+                        'severity': 'medium'
+                    }
+                }
+            }
+        }
+        
+        return test_docs.get(test_type, {'description': 'No documentation available'})
+    
+    def validate_test_config(self, test_type: str, test_params: Dict[str, Any]) -> List[str]:
+        """Validate test configuration and return list of issues"""
+        issues = []
+        
+        # Common validations
+        if 'severity' in test_params:
+            valid_severities = ['critical', 'high', 'medium', 'low']
+            if test_params['severity'] not in valid_severities:
+                issues.append(f"Invalid severity: {test_params['severity']}. Must be one of {valid_severities}")
+        
+        # Test-specific validations
+        if test_type in ['unique', 'not_null', 'email_format', 'future_date']:
+            if 'column_name' not in test_params:
+                issues.append(f"Test {test_type} requires 'column_name' parameter")
+        
+        elif test_type == 'foreign_key':
+            required_params = ['column_name', 'reference_table', 'reference_column']
+            for param in required_params:
+                if param not in test_params:
+                    issues.append(f"Test {test_type} requires '{param}' parameter")
+        
+        elif test_type == 'statistical_threshold':
+            if 'metric' not in test_params:
+                issues.append("Test statistical_threshold requires 'metric' parameter")
+            
+            if 'threshold_type' not in test_params:
+                issues.append("Test statistical_threshold requires 'threshold_type' parameter")
+            elif test_params['threshold_type'] not in ['absolute', 'relative']:
+                issues.append("threshold_type must be 'absolute' or 'relative'")
+            
+            if 'threshold_value' not in test_params:
+                issues.append("Test statistical_threshold requires 'threshold_value' parameter")
+        
+        return issues
