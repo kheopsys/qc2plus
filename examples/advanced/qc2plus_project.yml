@@ -1,0 +1,14 @@
+name: advanced_example
+version: 1.0.0
+profile: advanced_example
+
+model-paths: ["models"]
+target-path: "target"
+log-path: "logs"
+
+# Alertes activées pour l'exemple avancé
+alerting:
+  enabled_channels: ["slack"]
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
