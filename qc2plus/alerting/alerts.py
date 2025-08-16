@@ -284,58 +284,46 @@ class AlertManager:
     def _create_individual_email_html(self, alert_data: Dict[str, Any]) -> str:
         """Create HTML content for individual email alert"""
         
-        return f"""
+        html = '''
         <html>
         <body style="font-family: Arial, sans-serif; margin: 20px;">
             <div style="background-color: #ff4444; color: white; padding: 15px; border-radius: 5px;">
-                <h2>🚨 CRITICAL QUALITY TEST FAILURE</h2>
+                <h2>CRITICAL QUALITY TEST FAILURE</h2>
             </div>
             
             <div style="margin: 20px 0;">
                 <h3>Test Details</h3>
                 <table style="border-collapse: collapse; width: 100%;">
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Model:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['model']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Test:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['test']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Environment:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['target']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Time:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['timestamp']}</td></tr>
-                </table>
-            </div>
-            
-            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
-    def _create_individual_email_html(self, alert_data: Dict[str, Any]) -> str:
-        """Create HTML content for individual email alert"""
-        
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; margin: 20px;">
-            <div style="background-color: #ff4444; color: white; padding: 15px; border-radius: 5px;">
-                <h2>🚨 CRITICAL QUALITY TEST FAILURE</h2>
-            </div>
-            
-            <div style="margin: 20px 0;">
-                <h3>Test Details</h3>
-                <table style="border-collapse: collapse; width: 100%;">
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Model:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['model']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Test:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['test']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Environment:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['target']}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Time:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{alert_data['timestamp']}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Model:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Test:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Environment:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Time:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{}</td></tr>
                 </table>
             </div>
             
             <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
                 <h4>Error Message</h4>
                 <p style="font-family: monospace; background-color: white; padding: 10px; border-left: 4px solid #ff4444;">
-                    {alert_data['message']}
+                    {}
                 </p>
             </div>
             
             <div style="margin: 20px 0;">
-                <p><strong>Run ID:</strong> {alert_data['run_id']}</p>
-                <p><em>This is an automated alert from 2QC+ Data Quality Framework</em></p>
+                <p><strong>Run ID:</strong> {}</p>
+                <p><em>This is an automated alert from 2QC Plus Data Quality Framework</em></p>
             </div>
         </body>
         </html>
-        """
+        '''
+        
+        return html.format(
+            alert_data['model'],
+            alert_data['test'], 
+            alert_data['target'],
+            alert_data['timestamp'],
+            alert_data['message'],
+            alert_data['run_id']
+        )
     
     def _create_summary_email_html(self, alert_data: Dict[str, Any]) -> str:
         """Create HTML content for summary email alert"""
@@ -353,7 +341,7 @@ class AlertManager:
         <html>
         <body style="font-family: Arial, sans-serif; margin: 20px;">
             <div style="background-color: {color}; color: white; padding: 15px; border-radius: 5px;">
-                <h2>📊 2QC+ Quality Report Summary</h2>
+                <h2>2QC+ Quality Report Summary</h2>
             </div>
             
             <div style="margin: 20px 0;">
@@ -395,7 +383,7 @@ class AlertManager:
             
             <div style="margin: 20px 0;">
                 <p><em>Generated at: {alert_data['timestamp']}</em></p>
-                <p><em>This is an automated report from 2QC+ Data Quality Framework</em></p>
+                <p><em>This is an automated report from 2QC Plus Data Quality Framework</em></p>
             </div>
         </body>
         </html>
@@ -405,7 +393,7 @@ class AlertManager:
         """Create Slack payload for individual alert"""
         
         return {
-            "text": f"🚨 CRITICAL: 2QC+ Test Failure",
+            "text": "CRITICAL: 2QC+ Test Failure",
             "attachments": [
                 {
                     "color": "danger",
@@ -416,7 +404,7 @@ class AlertManager:
                         {"title": "Run ID", "value": alert_data['run_id'], "short": True},
                         {"title": "Error", "value": alert_data['message'], "short": False}
                     ],
-                    "footer": "2QC+ Data Quality Framework",
+                    "footer": "2QC Plus Data Quality Framework",
                     "ts": int(datetime.now().timestamp())
                 }
             ]
@@ -431,7 +419,7 @@ class AlertManager:
         success_rate = (alert_data['passed_tests'] / max(alert_data['total_tests'], 1)) * 100
         
         return {
-            "text": f"📊 2QC+ Quality Report - {alert_data['target']}",
+            "text": f"2QC+ Quality Report - {alert_data['target']}",
             "attachments": [
                 {
                     "color": color,
@@ -442,7 +430,7 @@ class AlertManager:
                         {"title": "Execution Time", "value": f"{alert_data['execution_duration']}s", "short": True},
                         {"title": "Run ID", "value": alert_data['run_id'], "short": False}
                     ],
-                    "footer": "2QC+ Data Quality Framework",
+                    "footer": "2QC Plus Data Quality Framework",
                     "ts": int(datetime.now().timestamp())
                 }
             ]
@@ -458,7 +446,7 @@ class AlertManager:
             "summary": "Critical 2QC+ Test Failure",
             "sections": [
                 {
-                    "activityTitle": "🚨 CRITICAL: 2QC+ Test Failure",
+                    "activityTitle": "CRITICAL: 2QC+ Test Failure",
                     "activitySubtitle": f"Model: {alert_data['model']} | Test: {alert_data['test']}",
                     "facts": [
                         {"name": "Environment", "value": alert_data['target']},
@@ -486,7 +474,7 @@ class AlertManager:
             "summary": "2QC+ Quality Report Summary",
             "sections": [
                 {
-                    "activityTitle": "📊 2QC+ Quality Report Summary",
+                    "activityTitle": "2QC+ Quality Report Summary",
                     "activitySubtitle": f"Environment: {alert_data['target']} | Success Rate: {success_rate:.1f}%",
                     "facts": [
                         {"name": "Total Tests", "value": str(alert_data['total_tests'])},
@@ -513,7 +501,7 @@ class AlertManager:
             'severity': 'medium',
             'model': 'test_model',
             'test': 'test_connection',
-            'message': 'This is a test alert from 2QC+ framework',
+            'message': 'This is a test alert from 2QC Plus framework',
             'timestamp': datetime.now().isoformat(),
             'run_id': 'test_run_12345',
             'target': 'test',

@@ -1,0 +1,11 @@
+basic_example:
+  target: demo
+  outputs:
+    demo:
+      type: postgresql
+      host: postgres
+      port: 5432
+      user: qc2plus
+      password: qc2plus_password
+      dbname: qc2plus_demo
+      schema: advanced_demo

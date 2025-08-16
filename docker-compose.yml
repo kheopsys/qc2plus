@@ -3,7 +3,8 @@ version: '3.8'
 services:
   # Base de données PostgreSQL
   postgres:
-    image: postgres:14
+    image: postgres:14-bookworm
+    platform: linux/arm64
     container_name: qc2plus-postgres
     environment:
       - POSTGRES_DB=qc2plus_demo
@@ -25,7 +26,7 @@ services:
       retries: 5
 
   # Runner principal 2QC+
-  qc2plus:
+  qc2plus-runner:
     build: .
     container_name: qc2plus-runner
     volumes:
@@ -44,7 +45,7 @@ services:
   # Exemple basique
   qc2plus-basic:
     build: .
-    container_name: qc2plus-basic-example
+    container_name: qc2plus-basic
     volumes:
       - ./examples/basic:/app/project
       - ./logs:/app/logs
@@ -59,14 +60,15 @@ services:
     command: >
       bash -c "
         echo 'Starting Basic Example...' &&
+        qc2plus --help
         qc2plus test-connection --target demo &&
-        qc2plus run --target demo
+        #qc2plus run --target demo
       "
 
   # Exemple avancé
   qc2plus-advanced:
     build: .
-    container_name: qc2plus-advanced-example
+    container_name: c2plus-advanced
     volumes:
       - ./examples/advanced:/app/project
       - ./logs:/app/logs

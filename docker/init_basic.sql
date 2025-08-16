@@ -18,7 +18,7 @@ CREATE TABLE basic_demo.customers (
 -- Orders table
 CREATE TABLE basic_demo.orders (
     order_id SERIAL PRIMARY KEY,
-    customer_id INTEGER REFERENCES basic_demo.customers(customer_id),
+    customer_id INTEGER,
     order_date DATE NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(20) DEFAULT 'pending',

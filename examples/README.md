@@ -4,15 +4,125 @@ Exemples pratiques pour démarrer avec 2QC+ Data Quality Framework.
 
 ## 🚀 Quick Start
 
+python3.11 -m pip install -e .
+qc2plus --help
+
 ### 1. Démarrer la base de données
+
 ```bash
 # Depuis la racine du projet
 docker-compose up -d postgres
+
+# check containers
+docker-compose ps
+
+# check container log
+docker-compose logs --tail=200 postgres
+
+# log to database
+docker exec -it qc2plus-postgres psql -U qc2plus -d qc2plus_demo
+```
+
+```bash
+# Depuis la racine du projet
+docker-compose build qc2plus-runner
+
+docker-compose up -d qc2plus-runner
+
+# check containers
+docker-compose ps
+
+# check container log
+docker-compose logs --tail=200 qc2plus-runner
+
+docker exec -it qc2plus-runner /bin/bash
+
+cd examples/basic
+
+qc2plus --help
+qc2plus test-connection --target demo 
+qc2plus run --target demo --level 1
+
+```
+
+```sh
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+import pandas as pd
+
+sql = """
+        -- Test: Email format validation on email
+        SELECT 
+            'email' as column_name,
+            COUNT(*) as failed_rows,
+            (SELECT COUNT(*) FROM basic_demo.customers) as total_rows,
+            'Invalid email format found in email' as message
+        FROM basic_demo.customers
+        WHERE email IS NOT NULL
+        AND NOT (
+            email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+        )
+        GROUP BY 1,4
+        HAVING COUNT(*) > 0
+"""
+
+sql_2 = """
+        -- Test: Email format validation on email
+        SELECT 
+            'email' as column_name,
+            COUNT(*) as failed_rows,
+            (SELECT COUNT(*) FROM basic_demo.customers) as total_rows,
+            'Invalid email format found in email' as message
+        FROM basic_demo.customers
+        WHERE email IS NOT NULL
+        AND NOT (
+            email = 'toto'
+        )
+        GROUP BY 1,4
+        HAVING COUNT(*) > 0
+"""
+
+user = "qc2plus"
+password = "qc2plus_password"
+host = "postgres"
+port = 5432
+dbname = "qc2plus_demo"
+
+def _create_postgresql_engine() -> Engine:
+    """Create PostgreSQL engine"""
+    connection_string = (
+        f"postgresql://{user}:{password}"
+        f"@{host}:{port}"
+        f"/{dbname}"
+    )
+    return create_engine(connection_string)
+
+engine = _create_postgresql_engine()
+
+def connection_manager_execute_query(query):
+  with engine.connect() as conn:
+      return pd.read_sql(text(query), conn)
+
+df = connection_manager_execute_query(sql)
 ```
 
 ### 2. Lancer l'exemple basique
 ```bash
+# Depuis la racine du projet
+docker-compose build qc2plus-basic
+
+docker-compose up -d qc2plus-basic
+
+# check containers
+docker-compose ps
+
+# check container log
+docker-compose logs --tail=200 qc2plus-basic
+
+docker exec -it qc2plus-basic /bin/bash
+
 cd examples/basic
+qc2plus --help
 qc2plus test-connection --target demo
 qc2plus run --target demo
 ```

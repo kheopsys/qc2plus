@@ -55,6 +55,7 @@ def run(models: tuple, level: str, target: str, profiles_dir: str,
     try:
         # Load project
         project = QC2PlusProject.load_project(project_dir)
+        click.echo("")
         click.echo(f"🚀 Running 2QC+ for project: {project.name}")
         
         # Initialize runner
@@ -76,6 +77,7 @@ def run(models: tuple, level: str, target: str, profiles_dir: str,
             click.echo("✅ All tests passed!")
             sys.exit(0)
         else:
+            click.echo("Final result")
             click.echo("❌ Some tests failed!")
             sys.exit(1)
             
@@ -174,9 +176,9 @@ def list_models(project_dir: str, output_format: str):
 
 def _display_results(results: dict):
     """Display test results in a formatted way"""
-    click.echo("\n" + "="*60)
+    #click.echo("\n" + "="*40)
     click.echo("2QC+ TEST RESULTS")
-    click.echo("="*60)
+    #click.echo("="*40)
     
     # Summary
     total_tests = results.get('total_tests', 0)
@@ -191,10 +193,10 @@ def _display_results(results: dict):
     # Detailed results by model
     for model_name, model_results in results.get('models', {}).items():
         click.echo(f"\n📋 Model: {model_name}")
-        click.echo("-" * 40)
+        #click.echo("-" * 40)
         
         # Level 1 results
-        if 'level1' in model_results:
+        if model_results.get('level1'):
             click.echo("  Level 1 (Business Rules):")
             for test_name, test_result in model_results['level1'].items():
                 status = "✅" if test_result['passed'] else "❌"
@@ -203,7 +205,7 @@ def _display_results(results: dict):
                     click.echo(f"      └─ {test_result['message']}")
         
         # Level 2 results
-        if 'level2' in model_results:
+        if model_results.get('level2'):
             click.echo("  Level 2 (ML Anomalies):")
             for analyzer_name, analyzer_result in model_results['level2'].items():
                 status = "✅" if analyzer_result['passed'] else "⚠️"

@@ -126,16 +126,19 @@ class ConnectionManager:
         """Execute a query and return results as DataFrame"""
         try:
             with self.engine.connect() as conn:
-                return pd.read_sql(query, conn)
+                return pd.read_sql(text(query), conn)
         except Exception as e:
             logging.error(f"Query execution failed: {str(e)}")
             raise
     
-    def execute_sql(self, sql: str) -> Any:
+    def execute_sql(self, sql: str, params: dict = None) -> Any:
         """Execute SQL statement (for non-SELECT queries)"""
         try:
             with self.engine.connect() as conn:
-                result = conn.execute(text(sql))
+                if params:
+                    result = conn.execute(text(sql), params)
+                else:
+                    result = conn.execute(text(sql))
                 conn.commit()
                 return result
         except Exception as e:
@@ -319,7 +322,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
     """PostgreSQL-specific SQL adaptations"""
     
     def adapt_regex(self, pattern: str) -> str:
-        return f"~ '{pattern}'"
+        return f"{pattern}"
     
     def adapt_date_functions(self, sql: str) -> str:
         sql = sql.replace('DATE_DIFF', 'DATE_PART')

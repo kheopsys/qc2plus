@@ -84,6 +84,10 @@ class Level1Engine:
                 # Results found means test failed (violations detected)
                 failed_rows = df.iloc[0].get('failed_rows', len(df))
                 total_rows = df.iloc[0].get('total_rows', failed_rows)
+
+                #row_dict = df.iloc[0].to_dict()
+                #failed_rows = row_dict.get('failed_rows', len(df))
+                #total_rows = row_dict.get('total_rows', failed_rows)
                 
                 return {
                     'passed': False,

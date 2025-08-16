@@ -8,7 +8,7 @@ A comprehensive framework for automated data quality control with two levels:
 
 __version__ = "1.0.0"
 __author__ = "QC2Plus Team"
-__email__ = "contact@qc2plus.org"
+__email__ = "contact-qc2plus@kheopsys.com"
 
 from qc2plus.core.project import QC2PlusProject
 from qc2plus.core.runner import QC2PlusRunner

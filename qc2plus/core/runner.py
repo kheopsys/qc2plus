@@ -19,7 +19,7 @@ from qc2plus.level2.temporal import TemporalAnalyzer
 from qc2plus.level2.multivariate import MultivariateAnalyzer
 from qc2plus.level2.distribution import DistributionAnalyzer
 from qc2plus.alerting.alerts import AlertManager
-from qc2plus.output.persistence import PersistenceManager
+from qc2plus.persistence.persistence import PersistenceManager
 
 
 class QC2PlusRunner:

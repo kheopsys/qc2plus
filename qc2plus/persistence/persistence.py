@@ -38,28 +38,19 @@ class PersistenceManager:
                 'status': results.get('status', 'unknown')
             }
             
-            # Build insert SQL
-            columns = ', '.join(run_data.keys())
-            placeholders = ', '.join(['%s'] * len(run_data))
+            # Build insert SQL with individual values
+            columns = list(run_data.keys())
+            columns_str = ', '.join(columns)
+            placeholders = ', '.join([f":{c}" for c in columns])
             
             sql = f"""
                 INSERT INTO {self.schema}.quality_run_summary 
-                ({columns}) 
+                ({columns_str}) 
                 VALUES ({placeholders})
             """
             
-            # Adapt for different databases
-            if self.connection_manager.db_type == 'bigquery':
-                # BigQuery uses different parameter syntax
-                placeholders = ', '.join([f'@param{i}' for i in range(len(run_data))])
-                sql = f"""
-                    INSERT INTO {self.schema}.quality_run_summary 
-                    ({columns}) 
-                    VALUES ({placeholders})
-                """
-            
-            # Execute insert
-            self.connection_manager.execute_sql(sql, list(run_data.values()))
+            # Execute insert with individual values (not a list)
+            self.connection_manager.execute_sql(sql, run_data)
             
             logging.info(f"Run summary saved: {run_data['run_id']}")
             
@@ -202,33 +193,18 @@ class PersistenceManager:
         # Build batch insert SQL
         columns = list(test_records[0].keys())
         columns_str = ', '.join(columns)
+        placeholders = ', '.join([f":{c}" for c in columns])
         
-        values_list = []
+        sql = f"""
+            INSERT INTO {self.schema}.quality_test_results 
+            ({columns_str}) 
+            VALUES ({placeholders})
+        """
+        
+        # Execute individual inserts (fix the list issue)
         for record in test_records:
-            values = [record[col] for col in columns]
-            values_list.append(values)
-        
-        # Create placeholders
-        if self.connection_manager.db_type == 'bigquery':
-            # BigQuery batch insert
-            placeholders = ', '.join(['%s'] * len(columns))
-            sql = f"""
-                INSERT INTO {self.schema}.quality_test_results 
-                ({columns_str}) 
-                VALUES ({placeholders})
-            """
-        else:
-            # Standard SQL batch insert
-            placeholders = ', '.join(['%s'] * len(columns))
-            sql = f"""
-                INSERT INTO {self.schema}.quality_test_results 
-                ({columns_str}) 
-                VALUES ({placeholders})
-            """
-        
-        # Execute batch insert
-        for values in values_list:
-            self.connection_manager.execute_sql(sql, values)
+            #values = [record[col] for col in columns]
+            self.connection_manager.execute_sql(sql, record)
     
     def _batch_insert_anomalies(self, anomaly_records: List[Dict[str, Any]]) -> None:
         """Batch insert anomaly records"""
@@ -239,23 +215,18 @@ class PersistenceManager:
         # Build batch insert SQL
         columns = list(anomaly_records[0].keys())
         columns_str = ', '.join(columns)
+        placeholders = ', '.join([f":{c}" for c in columns])
         
-        values_list = []
-        for record in anomaly_records:
-            values = [record[col] for col in columns]
-            values_list.append(values)
-        
-        # Create placeholders
-        placeholders = ', '.join(['%s'] * len(columns))
         sql = f"""
             INSERT INTO {self.schema}.quality_anomalies 
             ({columns_str}) 
             VALUES ({placeholders})
         """
         
-        # Execute batch insert
-        for values in values_list:
-            self.connection_manager.execute_sql(sql, values)
+        # Execute individual inserts (fix the list issue)
+        for record in anomaly_records:
+            #values = [record[col] for col in columns]
+            self.connection_manager.execute_sql(sql, record)
     
     def _extract_correlation_anomalies(self, details: Dict[str, Any], model_name: str, 
                                      analyzer_name: str) -> List[Dict[str, Any]]:

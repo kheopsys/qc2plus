@@ -31,15 +31,6 @@ class TemporalAnalyzer:
             metrics = config.get('metrics', ['count'])
             seasonality_check = config.get('seasonality_check', True)
             trend_check = config.get('trend_check', True)
-    def analyze(self, model_name: str, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Perform temporal analysis"""
-        
-        try:
-            # Extract configuration
-            date_column = config.get('date_column', 'created_at')
-            metrics = config.get('metrics', ['count'])
-            seasonality_check = config.get('seasonality_check', True)
-            trend_check = config.get('trend_check', True)
             anomaly_detection = config.get('anomaly_detection', True)
             window_days = config.get('window_days', 90)
             frequency = config.get('frequency', 'daily')  # daily, weekly, monthly
@@ -539,3 +530,4 @@ class TemporalAnalyzer:
                 
         except Exception as e:
             return {'error': f'Forecasting failed: {str(e)}'}
+
