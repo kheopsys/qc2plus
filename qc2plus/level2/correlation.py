@@ -30,12 +30,16 @@ class CorrelationAnalyzer:
             expected_correlation = config.get('expected_correlation')
             threshold = config.get('threshold', 0.2)
             correlation_type = config.get('correlation_type', 'pearson')
-            date_column = config.get('date_column', 'created_at')
+            date_column = config.get('date_column', None)
             window_days = config.get('window_days', 30)
             
             # Validate configuration
             if len(variables) < 2:
                 raise ValueError("At least 2 variables required for correlation analysis")
+
+            # Validate date column
+            if date_column is None:
+                raise ValueError("date_column required for correlation analysis")
             
             # Get data
             data = self._get_correlation_data(model_name, variables, date_column, window_days)
@@ -175,7 +179,7 @@ class CorrelationAnalyzer:
                     anomaly_reason = f"Unexpectedly weak correlation {corr_coef:.3f} (expected {expected_correlation:.3f})"
                 
                 # Check for very strong unexpected correlations
-                if not expected_correlation and abs(corr_coef) > 0.9:
+                if not expected_correlation and abs(corr_coef) > 0.7:
                     anomaly_detected = True
                     anomaly_reason = f"Unexpectedly strong correlation {corr_coef:.3f}"
                 
@@ -190,4 +194,166 @@ class CorrelationAnalyzer:
                         'severity': 'medium'
                     })
         
-        return
+        return results
+
+    def _detect_temporal_correlation_changes(self, model_name: str, variables: List[str],
+                                           date_column: str, correlation_type: str) -> Dict[str, Any]:
+        """Detect changes in correlation over time"""
+        
+        results = {
+            'passed': True,
+            'anomalies_count': 0,
+            'temporal_trends': {},
+            'anomalies': []
+        }
+        
+        try:
+            # Get historical correlation data (weekly windows over last 3 months)
+            schema = self.connection_manager.config.get('schema', 'public')
+            
+            query = f"""
+                WITH weekly_data AS (
+                    SELECT 
+                        DATE_TRUNC('week', {date_column}) as week_start,
+                        {', '.join([f'SUM({var}) as {var}' for var in variables])}
+                    FROM {schema}.{model_name}
+                    WHERE {date_column} >= CURRENT_DATE - INTERVAL '90 days'
+                    GROUP BY DATE_TRUNC('week', {date_column})
+                    ORDER BY week_start
+                )
+                SELECT * FROM weekly_data
+                WHERE week_start IS NOT NULL
+            """
+            
+            # Adapt query for different databases
+            if self.connection_manager.db_type == 'bigquery':
+                query = query.replace('DATE_TRUNC', 'DATE_TRUNC')
+                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
+                query = query.replace("INTERVAL '", "INTERVAL ")
+                query = query.replace(" days'", " DAY")
+            elif self.connection_manager.db_type == 'snowflake':
+                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
+                query = query.replace(" days'", " DAY'")
+            elif self.connection_manager.db_type == 'redshift':
+                query = query.replace('DATE_TRUNC', 'DATE_TRUNC')
+            
+            historical_data = self.connection_manager.execute_query(query)
+            
+            if len(historical_data) < 4:  # Need at least 4 weeks for trend analysis
+                return results
+            
+            # Calculate rolling correlations
+            for i in range(len(variables)):
+                for j in range(i + 1, len(variables)):
+                    var1, var2 = variables[i], variables[j]
+                    
+                    if var1 not in historical_data.columns or var2 not in historical_data.columns:
+                        continue
+                    
+                    # Calculate correlation for each time window
+                    correlations = []
+                    dates = []
+                    
+                    for idx in range(len(historical_data) - 2):  # Use 3-week rolling window
+                        window_data = historical_data.iloc[idx:idx+3]
+                        clean_window = window_data[[var1, var2]].dropna()
+                        
+                        if len(clean_window) >= 2:
+                            try:
+                                if correlation_type == 'pearson':
+                                    corr, _ = pearsonr(clean_window[var1], clean_window[var2])
+                                elif correlation_type == 'spearman':
+                                    corr, _ = spearmanr(clean_window[var1], clean_window[var2])
+                                else:
+                                    corr = np.corrcoef(clean_window[var1], clean_window[var2])[0, 1]
+                                
+                                if not np.isnan(corr):
+                                    correlations.append(corr)
+                                    dates.append(historical_data.iloc[idx+2]['week_start'])
+                            except:
+                                continue
+                    
+                    if len(correlations) >= 3:
+                        pair_name = f"{var1}_vs_{var2}"
+                        
+                        # Detect trends and anomalies
+                        correlation_std = np.std(correlations)
+                        correlation_mean = np.mean(correlations)
+                        recent_corr = correlations[-1]
+                        
+                        results['temporal_trends'][pair_name] = {
+                            'correlations': correlations,
+                            'dates': [str(d) for d in dates],
+                            'mean_correlation': correlation_mean,
+                            'std_correlation': correlation_std,
+                            'recent_correlation': recent_corr
+                        }
+                        
+                        # Check for anomalies
+                        # 1. High volatility in correlation
+                        if correlation_std > 0.3:
+                            results['passed'] = False
+                            results['anomalies_count'] += 1
+                            results['anomalies'].append({
+                                'variable_pair': pair_name,
+                                'anomaly_type': 'high_volatility',
+                                'correlation_std': correlation_std,
+                                'reason': f"High correlation volatility (std: {correlation_std:.3f})",
+                                'severity': 'medium'
+                            })
+                        
+                        # 2. Significant recent change
+                        if len(correlations) >= 2:
+                            recent_change = abs(correlations[-1] - correlations[-2])
+                            if recent_change > 0.4:
+                                results['passed'] = False
+                                results['anomalies_count'] += 1
+                                results['anomalies'].append({
+                                    'variable_pair': pair_name,
+                                    'anomaly_type': 'sudden_change',
+                                    'recent_change': recent_change,
+                                    'reason': f"Sudden correlation change: {recent_change:.3f}",
+                                    'severity': 'high'
+                                })
+                        
+                        # 3. Correlation degradation
+                        if len(correlations) >= 4:
+                            early_corr = np.mean(correlations[:2])
+                            late_corr = np.mean(correlations[-2:])
+                            degradation = early_corr - late_corr
+                            
+                            if (abs(early_corr) > 0.5 or abs(late_corr) > 0.5) and abs(degradation) > 0.3:
+                                results['passed'] = False
+                                results['anomalies_count'] += 1
+                                results['anomalies'].append({
+                                    'variable_pair': pair_name,
+                                    'anomaly_type': 'correlation_degradation',
+                                    'degradation': degradation,
+                                    'early_correlation': early_corr,
+                                    'recent_correlation': late_corr,
+                                    'reason': f"Correlation degradation: {degradation:.3f}",
+                                    'severity': 'high'
+                                })
+        
+        except Exception as e:
+            logging.warning(f"Temporal correlation analysis failed: {str(e)}")
+            # Don't fail the entire analysis for temporal issues
+            
+        return results
+
+    def _generate_summary_message(self, static_results: Dict[str, Any], 
+                                temporal_results: Dict[str, Any]) -> str:
+        """Generate summary message for correlation analysis"""
+        
+        messages = []
+        
+        if not static_results['passed']:
+            messages.append(f"Static correlation anomalies: {static_results['anomalies_count']}")
+        
+        if not temporal_results['passed']:
+            messages.append(f"Temporal correlation anomalies: {temporal_results['anomalies_count']}")
+        
+        if not messages:
+            return "All correlation checks passed"
+        
+        return "; ".join(messages)

@@ -133,8 +133,6 @@ class PersistenceManager:
                             anomalies = self._extract_correlation_anomalies(details, model_name, analyzer_name)
                         elif analyzer_name == 'temporal':
                             anomalies = self._extract_temporal_anomalies(details, model_name, analyzer_name)
-                        elif analyzer_name == 'multivariate':
-                            anomalies = self._extract_multivariate_anomalies(details, model_name, analyzer_name)
                         elif analyzer_name == 'distribution':
                             anomalies = self._extract_distribution_anomalies(details, model_name, analyzer_name)
                         else:
@@ -291,34 +289,6 @@ class PersistenceManager:
                     'severity': anomaly.get('severity', 'medium'),
                     'target_environment': 'unknown'
                 })
-        
-        return anomalies
-    
-    def _extract_multivariate_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                       analyzer_name: str) -> List[Dict[str, Any]]:
-        """Extract multivariate-specific anomalies"""
-        
-        anomalies = []
-        
-        # Extract consensus anomalies
-        consensus_anomalies = details.get('consensus_anomalies', {})
-        
-        for anomaly in consensus_anomalies.get('anomalies', []):
-            feature_values = anomaly.get('feature_values', {})
-            affected_columns = ', '.join(feature_values.keys()) if feature_values else ''
-            
-            anomalies.append({
-                'anomaly_id': str(uuid.uuid4()),
-                'model_name': model_name,
-                'analyzer_type': analyzer_name,
-                'anomaly_type': 'multivariate_outlier',
-                'anomaly_score': anomaly.get('confidence', 1.0),
-                'affected_columns': affected_columns,
-                'anomaly_details': json.dumps(anomaly),
-                'detection_time': datetime.now(),
-                'severity': 'high' if anomaly.get('confidence', 0) > 0.8 else 'medium',
-                'target_environment': 'unknown'
-            })
         
         return anomalies
     

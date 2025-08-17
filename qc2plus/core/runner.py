@@ -16,8 +16,8 @@ from qc2plus.core.connection import ConnectionManager
 from qc2plus.level1.engine import Level1Engine
 from qc2plus.level2.correlation import CorrelationAnalyzer
 from qc2plus.level2.temporal import TemporalAnalyzer
-from qc2plus.level2.multivariate import MultivariateAnalyzer
 from qc2plus.level2.distribution import DistributionAnalyzer
+from qc2plus.level2.anomaly_filter import AnomalyFilter
 from qc2plus.alerting.alerts import AlertManager
 from qc2plus.persistence.persistence import PersistenceManager
 
@@ -42,7 +42,6 @@ class QC2PlusRunner:
         self.level1_engine = Level1Engine(self.connection_manager)
         self.correlation_analyzer = CorrelationAnalyzer(self.connection_manager)
         self.temporal_analyzer = TemporalAnalyzer(self.connection_manager)
-        self.multivariate_analyzer = MultivariateAnalyzer(self.connection_manager)
         self.distribution_analyzer = DistributionAnalyzer(self.connection_manager)
         
         # Initialize alerting and persistence
@@ -93,6 +92,9 @@ class QC2PlusRunner:
         # Calculate final statistics
         execution_duration = int(time.time() - start_time)
         results['execution_duration'] = execution_duration
+
+        # Filter False anomaly
+        #results = apply_anomaly_filtering(results, self.connection_manager)
         
         # Determine overall status
         if results['critical_failures'] > 0:
@@ -243,18 +245,6 @@ class QC2PlusRunner:
                 logging.error(f"Temporal analysis failed for {model_name}: {str(e)}")
                 level2_results['temporal'] = {'error': str(e), 'passed': False}
         
-        # Multivariate analysis
-        if 'multivariate_analysis' in level2_config:
-            try:
-                multivariate_result = self.multivariate_analyzer.analyze(
-                    model_name, 
-                    level2_config['multivariate_analysis']
-                )
-                level2_results['multivariate'] = multivariate_result
-            except Exception as e:
-                logging.error(f"Multivariate analysis failed for {model_name}: {str(e)}")
-                level2_results['multivariate'] = {'error': str(e), 'passed': False}
-        
         # Distribution analysis
         if 'distribution_analysis' in level2_config:
             try:
@@ -292,6 +282,36 @@ class QC2PlusRunner:
                 else:
                     results['failed_tests'] += 1
                     # Level 2 anomalies are typically not critical
+    
+    def apply_anomaly_filtering(results: Dict[str, Any], connection_manager: ConnectionManager) -> Dict[str, Any]:
+        """Apply anomaly filtering to test results"""
+        
+        try:
+            anomaly_filter = AnomalyFilter(connection_manager)
+            
+            # Apply filtering to each model
+            filtered_results = results.copy()
+            
+            for model_name in results.get('models', {}):
+                filtered_results = anomaly_filter.filter_anomalies(filtered_results, model_name)
+            
+            # Add filtering metadata
+            filtered_results['anomaly_filtering'] = {
+                'applied': True,
+                'timestamp': datetime.now().isoformat(),
+                'filters_used': ['seasonal_context', 'correlation_analysis']
+            }
+            
+            return filtered_results
+            
+        except Exception as e:
+            logging.error(f"Anomaly filtering failed: {str(e)}")
+            # Return original results if filtering fails
+            results['anomaly_filtering'] = {
+                'applied': False,
+                'error': str(e)
+            }
+            return results
     
     def _persist_results(self, results: Dict[str, Any]) -> None:
         """Persist results to database"""

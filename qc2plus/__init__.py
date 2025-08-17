@@ -15,7 +15,6 @@ from qc2plus.core.runner import QC2PlusRunner
 from qc2plus.level1.engine import Level1Engine
 from qc2plus.level2.correlation import CorrelationAnalyzer
 from qc2plus.level2.temporal import TemporalAnalyzer
-from qc2plus.level2.multivariate import MultivariateAnalyzer
 from qc2plus.level2.distribution import DistributionAnalyzer
 
 __all__ = [
@@ -24,6 +23,5 @@ __all__ = [
     "Level1Engine",
     "CorrelationAnalyzer",
     "TemporalAnalyzer",
-    "MultivariateAnalyzer",
     "DistributionAnalyzer",
 ]

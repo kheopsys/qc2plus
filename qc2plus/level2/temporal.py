@@ -153,7 +153,7 @@ class TemporalAnalyzer:
         return self.connection_manager.execute_query(query)
     
     def _analyze_metric(self, data: pd.DataFrame, metric: str, seasonality_check: bool,
-                       trend_check: bool, anomaly_detection: bool) -> Dict[str, Any]:
+                       trend_check: bool, anomaly_detection: bool, frequency: str) -> Dict[str, Any]:
         """Analyze a single metric for temporal patterns"""
         
         results = {
@@ -197,7 +197,7 @@ class TemporalAnalyzer:
                     results['anomalies'].extend(anomaly_result.get('anomalies', []))
             
             # Stationarity check
-            stationarity_result = self._check_stationarity(ts_data, metric)
+            stationarity_result = self._check_stationarity(ts_data, metric, frequency)
             results['stationarity'] = stationarity_result
             
         except Exception as e:
@@ -207,7 +207,7 @@ class TemporalAnalyzer:
         
         return results
     
-    def _check_seasonality(self, ts_data: pd.Series, metric: str) -> Dict[str, Any]:
+    def _check_seasonality(self, ts_data: pd.Series, metric: str, frequency: str) -> Dict[str, Any]:
         """Check for seasonality anomalies"""
         
         results = {
@@ -221,13 +221,24 @@ class TemporalAnalyzer:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 
-                # Determine period based on data frequency
-                if len(ts_data) >= 14:
-                    period = 7  # Weekly seasonality for daily data
-                elif len(ts_data) >= 28:
-                    period = min(7, len(ts_data) // 4)
+                if frequency == 'daily':
+                    period = 7   # Weekly seasonality (7 days)                        
+                elif frequency == 'weekly': 
+                    # Weekly data - look for monthly/quarterly patterns
+                    if len(ts_data) >= 52:
+                        period = 52   # Yearly seasonality (52 weeks)
+                    elif len(ts_data) >= 12:
+                        period = 4   # Monthly pattern
+                    else:
+                        return results 
+                elif frequency == 'monthly':
+                    # Monthly data - look for quarterly/yearly patterns
+                    if len(ts_data) >= 12:
+                        period = 12  # Yearly seasonality (12 months)
+                    else:
+                        return results
                 else:
-                    return results  # Not enough data for seasonality
+                    return results
                 
                 if len(ts_data) < 2 * period:
                     return results
