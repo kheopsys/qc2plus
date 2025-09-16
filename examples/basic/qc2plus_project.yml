@@ -1,6 +1,6 @@
-name: basic_quality_example
+name: basic_example
 version: 1.0.0
-profile: basic_quality_example
+profile: basic_example
 
 model-paths: ["models"]
 target-path: "target"
@@ -11,7 +11,7 @@ vars:
     statistical_threshold_sensitivity: 3.0
     
 alerting:
-  enabled_channels: []  # Pas d'alertes pour l'exemple basique
+  enabled_channels: [] 
   thresholds:
     critical_failure_threshold: 1
     failure_rate_threshold: 0.3

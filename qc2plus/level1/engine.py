@@ -84,10 +84,6 @@ class Level1Engine:
                 # Results found means test failed (violations detected)
                 failed_rows = df.iloc[0].get('failed_rows', len(df))
                 total_rows = df.iloc[0].get('total_rows', failed_rows)
-
-                #row_dict = df.iloc[0].to_dict()
-                #failed_rows = row_dict.get('failed_rows', len(df))
-                #total_rows = row_dict.get('total_rows', failed_rows)
                 
                 return {
                     'passed': False,
@@ -184,7 +180,7 @@ class Level1Engine:
                     }
                 }
             },
-            'foreign_key': {
+            'relationship': {
                 'description': 'Tests referential integrity between tables',
                 'parameters': {
                     'column_name': 'Foreign key column',
@@ -233,6 +229,27 @@ class Level1Engine:
                         'severity': 'medium'
                     }
                 }
+            },
+            'accepted_benchmark_values': {
+                'description': 'Tests that column values match benchmark distribution percentages',
+                'parameters': {
+                    'column_name': 'Column to test distribution',
+                    'benchmark_values': 'Dictionary of value: expected_percentage pairs',
+                    'threshold': 'Acceptable deviation from benchmark (0.0-1.0)',
+                    'severity': 'Test severity (critical, high, medium, low)'
+                },
+                'example': {
+                    'benchmark_values': {
+                        'column_name': 'customer_segment',
+                        'benchmark_values': {
+                            'Mono-buyer': 50,
+                            'Regular-buyer': 40,
+                            'VIP-buyer': 10
+                        },
+                        'threshold': 0.2,
+                        'severity': 'critical'
+                    }
+                }
             }
         }
         
@@ -253,7 +270,7 @@ class Level1Engine:
             if 'column_name' not in test_params:
                 issues.append(f"Test {test_type} requires 'column_name' parameter")
         
-        elif test_type == 'foreign_key':
+        elif test_type == 'relationship':
             required_params = ['column_name', 'reference_table', 'reference_column']
             for param in required_params:
                 if param not in test_params:
@@ -270,5 +287,30 @@ class Level1Engine:
             
             if 'threshold_value' not in test_params:
                 issues.append("Test statistical_threshold requires 'threshold_value' parameter")
+
+        elif test_type == 'accepted_benchmark_values':
+            required_params = ['column_name', 'benchmark_values', 'threshold']
+            print('start')
+            print(required_params)
+            for param in required_params:
+                if param not in test_params:
+                    issues.append(f"Test {test_type} requires '{param}' parameter")
+            
+            # Validate benchmark_values format
+            if 'accepted_benchmark_values' in test_params:
+                benchmark_values = test_params['benchmark_values']
+                if not isinstance(benchmark_values, dict):
+                    issues.append("benchmark_values must be a dictionary")
+                else:
+                    # Check that percentages sum to ~100%
+                    total_pct = sum(benchmark_values.values())
+                    if abs(total_pct - 100) > 5:  # Allow 5% tolerance
+                        issues.append(f"benchmark_values percentages should sum to ~100% (got {total_pct}%)")
+            
+            # Validate threshold
+            if 'threshold' in test_params:
+                threshold = test_params['threshold']
+                if not isinstance(threshold, (int, float)) or threshold < 0 or threshold > 1:
+                    issues.append("threshold must be a number between 0 and 1")
         
         return issues

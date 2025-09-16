@@ -10,7 +10,6 @@ from typing import Dict, List, Any, Optional
 
 from qc2plus.core.connection import ConnectionManager
 
-
 class DistributionAnalyzer:
     """Analyzes data distributions - Focus on segment shifts and behavior anomalies"""
     

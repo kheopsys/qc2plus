@@ -1,0 +1,42 @@
+models:
+  - name: orders
+    description: "Advanced Level 1 + Level 2 ML tests"
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: order_id
+            severity: critical
+        - not_null:
+            column_name: customer_id
+            severity: critical
+        - not_null:
+            column_name: order_date
+            severity: critical
+        - not_null:
+            column_name: total_amount
+            severity: critical
+        - relationship:
+            column_name: customer_id
+            reference_table: customers
+            reference_column: customer_id
+        - future_date:
+            column_name: order_date
+        - freshness:
+            column_name: created_at
+            max_age_days: 2
+            severity: high
+      level2:
+        temporal_analysis:
+          date_column: created_at
+          metrics: [count, sum_total_amount]
+          seasonality_check: true
+          window_days: 720
+          frequency: weekly
+        distribution_analysis:
+          segments: [country]
+          segments_source: customers.country on customers.id
+          metrics: [count, sum_total_amount]
+          reference_period: 30
+          comparison_period: 7
+ 
+# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement

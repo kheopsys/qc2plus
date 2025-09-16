@@ -12,9 +12,9 @@ services:
       - POSTGRES_PASSWORD=qc2plus_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./examples/data/init_tables.sql:/docker-entrypoint-initdb.d/01_init_tables.sql
-      - ./examples/data/load_sample_data.sql:/docker-entrypoint-initdb.d/02_load_sample_data.sql
-      - ./examples/data/transform_data.sql:/docker-entrypoint-initdb.d/03_transform_data.sql
+      - ./docker/init_basic.sql:/docker-entrypoint-initdb.d/01_basic.sql
+      - ./docker/init_advanced.sql:/docker-entrypoint-initdb.d/02_advanced.sql
+      - ./docker/sample_data.sql:/docker-entrypoint-initdb.d/03_sample_data.sql
     ports:
       - "5432:5432"
     networks:
@@ -60,9 +60,9 @@ services:
     command: >
       bash -c "
         echo 'Starting Basic Example...' &&
-        qc2plus --help &&
+        qc2plus --help
         qc2plus test-connection --target demo &&
-        qc2plus run --target demo
+        #qc2plus run --target demo
       "
 
   # Exemple avancé
@@ -85,7 +85,6 @@ services:
       bash -c "
         echo 'Starting Advanced Example...' &&
         sleep 30 &&
-        qc2plus --help &&
         qc2plus test-connection --target demo &&
         qc2plus run --target demo --level all
       "

@@ -6,7 +6,7 @@ model-paths: ["models"]
 target-path: "target"
 log-path: "logs"
 
-# Alertes activées pour l'exemple avancé
+
 alerting:
   enabled_channels: ["slack"]
   slack:

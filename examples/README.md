@@ -49,6 +49,7 @@ cd examples/advanced
 qc2plus --help
 qc2plus test-connection --target demo 
 qc2plus run --target demo --level all
+qc2plus run --target demo --level 1 --models customer_datamart
 
 ```
 

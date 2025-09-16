@@ -25,16 +25,12 @@ CREATE TABLE demo.orders (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Sessions table
 CREATE TABLE IF NOT EXISTS demo.user_sessions (
     session_id SERIAL PRIMARY KEY,
     session_date DATE NOT NULL,
-    user_count INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
     page_views INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes
-CREATE INDEX idx_basic_customers_email ON basic_demo.customers(email);
-CREATE INDEX idx_basic_customers_created_at ON basic_demo.customers(created_at);
-CREATE INDEX idx_basic_orders_customer_id ON basic_demo.orders(customer_id);
-CREATE INDEX idx_basic_orders_order_date ON basic_demo.orders(order_date);

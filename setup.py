@@ -55,6 +55,6 @@ setup(
     project_urls={
         "Bug Reports": "https://github.com/kheopsys/qc2plus-internal/issues",
         "Source": "https://github.com/kheopsys/qc2plus-internal",
-        "Documentation": "https://github.com/kheopsys/qc2plus-internal",
+        "Documentation": "https://github.com/kheopsys/qc2plus-internal/README.md",
     },
 )

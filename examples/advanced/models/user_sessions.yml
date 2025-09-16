@@ -1,0 +1,31 @@
+models:
+  - name: user_sessions
+    description: "Advanced Level 1 + Level 2 ML tests"
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: session_id
+            severity: critical
+        - not_null:
+            column_name: user_id
+            severity: critical
+        - future_date:
+            column_name: session_date
+        - range_check:
+            column_name: page_views
+            min_value: 1
+            severity: medium
+        - freshness:
+            column_name: session_date
+            max_age_days: 2
+            severity: high
+      level2:
+        temporal_analysis:
+          date_column: session_date
+          metrics: [count, sum_page_views]
+          seasonality_check: false
+          window_days: 7
+          frequency: daily
+      
+# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement
+

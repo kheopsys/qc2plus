@@ -51,7 +51,7 @@ SQL_MACROS = {
         HAVING COUNT(*) > 0
     """,
     
-    'foreign_key': """
+    'relationship': """
         -- Test: Foreign key constraint {{ column_name }} -> {{ reference_table }}.{{ reference_column }}
         SELECT 
             '{{ column_name }}' as column_name,
@@ -223,33 +223,6 @@ SQL_MACROS = {
         {{ custom_sql }}
     """,
     
-    'relationship': """
-        -- Test: Relationship validation between tables
-        WITH relationship_check AS (
-            SELECT 
-                {{ from_column }} as from_value,
-                COUNT(*) as from_count
-            FROM {{ schema }}.{{ from_table }}
-            GROUP BY {{ from_column }}
-        ),
-        target_check AS (
-            SELECT 
-                {{ to_column }} as to_value,
-                COUNT(*) as to_count
-            FROM {{ schema }}.{{ to_table }}
-            GROUP BY {{ to_column }}
-        )
-        SELECT 
-            'relationship' as column_name,
-            COUNT(*) as failed_rows,
-            (SELECT COUNT(DISTINCT {{ from_column }}) FROM {{ schema }}.{{ from_table }}) as total_rows,
-            'Relationship violations found between {{ from_table }} and {{ to_table }}' as message
-        FROM relationship_check r
-        LEFT JOIN target_check t ON r.from_value = t.to_value
-        WHERE t.to_value IS NULL
-        HAVING COUNT(*) > 0
-    """,
-    
     'freshness': """
         -- Test: Data freshness check
         SELECT 
@@ -268,7 +241,60 @@ SQL_MACROS = {
         FROM {{ schema }}.{{ model_name }}
         WHERE {{ column_name }} IS NOT NULL
         HAVING failed_rows = 1
-    """
+    """,
+
+    'accepted_benchmark_values': """
+        -- Test: Benchmark values distribution validation on {{ column_name }}
+        WITH actual_distribution AS (
+            SELECT 
+                {{ column_name }},
+                COUNT(*) as actual_count,
+                COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as actual_percentage
+            FROM {{ schema }}.{{ model_name }}
+            WHERE {{ column_name }} IS NOT NULL
+            GROUP BY {{ column_name }}
+        ),
+        benchmark_comparison AS (
+            SELECT 
+                a.{{ column_name }},
+                a.actual_percentage,
+                CASE 
+                    {% for value, expected_pct in benchmark_values.items() %}
+                    WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                    {% endfor %}
+                    ELSE 0
+                END as expected_percentage,
+                ABS(a.actual_percentage - CASE 
+                    {% for value, expected_pct in benchmark_values.items() %}
+                    WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                    {% endfor %}
+                    ELSE 0
+                END) as percentage_diff
+            FROM actual_distribution a
+        ),
+        violations AS (
+            SELECT 
+                {{ column_name }},
+                actual_percentage,
+                expected_percentage,
+                percentage_diff
+            FROM benchmark_comparison
+            WHERE percentage_diff > {{ threshold }} * 100
+        )
+        SELECT 
+            '{{ column_name }}' as column_name,
+            COUNT(*) as failed_rows,
+            (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) as total_rows,
+            CONCAT(
+                'Benchmark violations: ',
+                STRING_AGG(
+                    CONCAT({{ column_name }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)'),
+                    ', '
+                )
+            ) as message
+        FROM violations
+        HAVING COUNT(*) > 0
+    """,
 }
 
 

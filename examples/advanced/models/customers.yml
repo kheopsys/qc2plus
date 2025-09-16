@@ -6,9 +6,6 @@ models:
         - unique:
             column_name: customer_id
             severity: critical
-        - not_null:
-            column_name: email
-            severity: critical
         - email_format:
             column_name: email
             severity: medium
@@ -17,23 +14,13 @@ models:
             min_value: 18
             max_value: 120
             severity: medium
-      
       level2:
-        correlation_analysis:
-          variables: [lifetime_value, order_frequency]
-          expected_correlation: 0.7
-          threshold: 0.3
-          window_days: 20
-          date_column: updated_at
-        temporal_analysis:
-          date_column: created_at
+        - distribution_analysis:
+          segments: [country, status]
           metrics: [count]
-          seasonality_check: true
-          window_days: 720
-          frequency: weekly
-        distribution_analysis:
-          segments: [country, customer_segment]
-          metrics: [lifetime_value, order_frequency]
+          date_column: created_at
           reference_period: 30
           comparison_period: 7
- 
+        
+# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement
+        
