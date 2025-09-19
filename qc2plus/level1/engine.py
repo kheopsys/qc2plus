@@ -291,7 +291,6 @@ class Level1Engine:
         elif test_type == 'accepted_benchmark_values':
             required_params = ['column_name', 'benchmark_values', 'threshold']
             print('start')
-            print(required_params)
             for param in required_params:
                 if param not in test_params:
                     issues.append(f"Test {test_type} requires '{param}' parameter")

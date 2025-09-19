@@ -299,6 +299,15 @@ INSERT INTO demo.orders (customer_id, order_date, total_amount, status) VALUES
 
 -- Normal session data (baseline)
 INSERT INTO demo.user_sessions (session_date, user_id, page_views) VALUES
+
+
+-- Jour -8 (normal)
+(CURRENT_DATE - INTERVAL '8 days', 1, 5),
+(CURRENT_DATE - INTERVAL '8 days', 2, 3),
+(CURRENT_DATE - INTERVAL '8 days', 3, 7),
+(CURRENT_DATE - INTERVAL '8 days', 4, 2),
+
+
 (CURRENT_DATE - INTERVAL '7 days', 1, 7),
 (CURRENT_DATE - INTERVAL '7 days', 10, 8),
 (CURRENT_DATE - INTERVAL '7 days', 1, 1),
@@ -339,4 +348,4 @@ INSERT INTO demo.user_sessions (session_date, user_id, page_views) VALUES
 (CURRENT_DATE - INTERVAL '1 days', 1, 2),
 
 -- Anormal session data (O pages view in session)
-(CURRENT_DATE - INTERVAL '1 days', 2, 0);
+(CURRENT_DATE - INTERVAL '1 days', 2, 100);

@@ -6,7 +6,7 @@ Exemples pratiques pour démarrer avec 2QC+ Data Quality Framework.
 
 python3.11 -m pip install -e .
 qc2plus --help
-
+ 
 ### 1. Démarrer la base de données
 
 ```bash
@@ -21,13 +21,14 @@ docker-compose logs --tail=200 postgres
 
 # log to database
 docker exec -it qc2plus-postgres psql -U qc2plus -d qc2plus_demo
+
 ```
 
 ```bash
 # Depuis la racine du projet
 docker-compose build qc2plus-runner
 
-docker-compose up -d qc2plus-runner
+docker-compose up -d qc2plus-runner # docker-compose stop qc2plus-runner
 
 # check containers
 docker-compose ps
@@ -35,7 +36,8 @@ docker-compose ps
 # check container log
 docker-compose logs --tail=200 qc2plus-runner
 
-docker exec -it qc2plus-runner /bin/bash
+docker exec -it qc2plus-runner /bin/bash # OR  docker exec -it qc2plus-runner bash
+
 
 cd examples/basic
 
@@ -43,13 +45,12 @@ qc2plus --help
 qc2plus test-connection --target demo 
 qc2plus run --target demo --level 1
 
-
 cd examples/advanced
 
 qc2plus --help
 qc2plus test-connection --target demo 
 qc2plus run --target demo --level all
-qc2plus run --target demo --level 1 --models customer_datamart
+qc2plus run --target demo --level 1 --models customers
 
 ```
 
@@ -139,7 +140,7 @@ qc2plus run --target demo
 ```bash
 cd examples/advanced  
 qc2plus test-connection --target demo
-qc2plus run --target demo --level all
+qc2plus run --target demo --level allx  
 ```
 
 ## 📁 Structure

@@ -35,8 +35,7 @@ SQL_MACROS = {
         HAVING COUNT(*) > 0
     """,
     
-    'email_format': """
-        -- Test: Email format validation on {{ column_name }}
+    'email_format': """-- Test: Email format validation on {{ column_name }}
         SELECT 
             '{{ column_name }}' as column_name,
             COUNT(*) as failed_rows,
@@ -48,8 +47,7 @@ SQL_MACROS = {
             {{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'
         )
         GROUP BY 1,4
-        HAVING COUNT(*) > 0
-    """,
+        HAVING COUNT(*) > 0""",
     
     'relationship': """
         -- Test: Foreign key constraint {{ column_name }} -> {{ reference_table }}.{{ reference_column }}
@@ -80,103 +78,106 @@ SQL_MACROS = {
     """,
     
     'statistical_threshold': """
-        -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
-        WITH current_value AS (
-            SELECT 
-                {% if column_name %}
-                    {% if metric == 'count' %}
-                        COUNT({{ column_name }}) as current_metric
-                    {% elif metric == 'avg' %}
-                        AVG({{ column_name }}) as current_metric
-                    {% elif metric == 'sum' %}
-                        SUM({{ column_name }}) as current_metric
-                    {% elif metric == 'min' %}
-                        MIN({{ column_name }}) as current_metric
-                    {% elif metric == 'max' %}
-                        MAX({{ column_name }}) as current_metric
-                    {% else %}
-                        COUNT({{ column_name }}) as current_metric
-                    {% endif %}
-                {% else %}
-                    -- Table-level metrics
-                    {% if metric == 'count' %}
-                        COUNT(*) as current_metric
-                    {% else %}
-                        COUNT(*) as current_metric
-                    {% endif %}
-                {% endif %}
-            FROM {{ schema }}.{{ model_name }}
-            WHERE DATE(created_at) = CURRENT_DATE
-        ),
-        historical_stats AS (
-            SELECT 
-                {% if column_name %}
-                    {% if metric == 'count' %}
-                        AVG(COUNT({{ column_name }})) as avg_metric,
-                        STDDEV(COUNT({{ column_name }})) as stddev_metric
-                    {% elif metric == 'avg' %}
-                        AVG(AVG({{ column_name }})) as avg_metric,
-                        STDDEV(AVG({{ column_name }})) as stddev_metric
-                    {% elif metric == 'sum' %}
-                        AVG(SUM({{ column_name }})) as avg_metric,
-                        STDDEV(SUM({{ column_name }})) as stddev_metric
-                    {% elif metric == 'min' %}
-                        AVG(MIN({{ column_name }})) as avg_metric,
-                        STDDEV(MIN({{ column_name }})) as stddev_metric
-                    {% elif metric == 'max' %}
-                        AVG(MAX({{ column_name }})) as avg_metric,
-                        STDDEV(MAX({{ column_name }})) as stddev_metric
-                    {% else %}
-                        AVG(COUNT({{ column_name }})) as avg_metric,
-                        STDDEV(COUNT({{ column_name }})) as stddev_metric
-                    {% endif %}
-                {% else %}
-                    AVG(COUNT(*)) as avg_metric,
-                    STDDEV(COUNT(*)) as stddev_metric
-                {% endif %}
-            FROM {{ schema }}.{{ model_name }}
-            WHERE DATE(created_at) BETWEEN 
-                CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
-                AND CURRENT_DATE - INTERVAL '1 day'
-            GROUP BY DATE(created_at)
-        ),
-        threshold_check AS (
-            SELECT 
-                c.current_metric,
-                h.avg_metric,
-                h.stddev_metric,
-                {% if threshold_type == 'absolute' %}
-                    {{ threshold_value }} as threshold_value,
-                    CASE 
-                        WHEN c.current_metric > {{ threshold_value }} THEN 1
-                        ELSE 0
-                    END as threshold_exceeded
-                {% else %}
-                    h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) as threshold_value,
-                    CASE 
-                        WHEN c.current_metric > h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
-                        WHEN c.current_metric < h.avg_metric - ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
-                        ELSE 0
-                    END as threshold_exceeded
-                {% endif %}
-            FROM current_value c
-            CROSS JOIN historical_stats h
-        )
+    -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
+    WITH daily_metrics AS (
         SELECT 
-            '{{ column_name or metric }}' as column_name,
-            threshold_exceeded as failed_rows,
-            1 as total_rows,
-            CONCAT(
-                'Statistical threshold exceeded: current=', 
-                ROUND(current_metric, 2), 
-                ', threshold=', 
-                ROUND(threshold_value, 2),
-                ', historical_avg=',
-                ROUND(avg_metric, 2)
-            ) as message
-        FROM threshold_check
-        WHERE threshold_exceeded = 1
-    """,
+            DATE(created_at) as metric_date,
+            {% if column_name %}
+                {% if metric == 'count' %}
+                    COUNT({{ column_name }}) as daily_value
+                {% elif metric == 'avg' %}
+                    AVG({{ column_name }}) as daily_value
+                {% elif metric == 'sum' %}
+                    SUM({{ column_name }}) as daily_value
+                {% elif metric == 'min' %}
+                    MIN({{ column_name }}) as daily_value
+                {% elif metric == 'max' %}
+                    MAX({{ column_name }}) as daily_value
+                {% else %}
+                    COUNT({{ column_name }}) as daily_value
+                {% endif %}
+            {% else %}
+                {% if metric == 'count' %}
+                    COUNT(*) as daily_value
+                {% else %}
+                    COUNT(*) as daily_value
+                {% endif %}
+            {% endif %}
+        FROM {{ schema }}.{{ model_name }}
+        WHERE DATE(created_at) BETWEEN 
+            CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
+            AND CURRENT_DATE - INTERVAL '1 day'
+        GROUP BY DATE(created_at)
+    ),
+    current_value AS (
+        SELECT 
+            {% if column_name %}
+                {% if metric == 'count' %}
+                    COUNT({{ column_name }}) as current_metric
+                {% elif metric == 'avg' %}
+                    AVG({{ column_name }}) as current_metric
+                {% elif metric == 'sum' %}
+                    SUM({{ column_name }}) as current_metric
+                {% elif metric == 'min' %}
+                    MIN({{ column_name }}) as current_metric
+                {% elif metric == 'max' %}
+                    MAX({{ column_name }}) as current_metric
+                {% else %}
+                    COUNT({{ column_name }}) as current_metric
+                {% endif %}
+            {% else %}
+                {% if metric == 'count' %}
+                    COUNT(*) as current_metric
+                {% else %}
+                    COUNT(*) as current_metric
+                {% endif %}
+            {% endif %}
+        FROM {{ schema }}.{{ model_name }}
+        WHERE DATE(created_at) = CURRENT_DATE
+    ),
+    historical_stats AS (
+        SELECT 
+            AVG(daily_value) as avg_metric,
+            STDDEV(daily_value) as stddev_metric
+        FROM daily_metrics
+    ),
+    threshold_check AS (
+        SELECT 
+            c.current_metric,
+            h.avg_metric,
+            h.stddev_metric,
+            {% if threshold_type == 'absolute' %}
+                {{ threshold_value }} as threshold_value,
+                CASE 
+                    WHEN c.current_metric > {{ threshold_value }} THEN 1
+                    ELSE 0
+                END as threshold_exceeded
+            {% else %}
+                h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) as threshold_value,
+                CASE 
+                    WHEN c.current_metric > h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
+                    WHEN c.current_metric < h.avg_metric - ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
+                    ELSE 0
+                END as threshold_exceeded
+            {% endif %}
+        FROM current_value c
+        CROSS JOIN historical_stats h
+    )
+    SELECT 
+        '{{ column_name or metric }}' as column_name,
+        threshold_exceeded as failed_rows,
+        1 as total_rows,
+        CONCAT(
+            'Statistical threshold exceeded: current=', 
+            ROUND(current_metric, 2), 
+            ', threshold=', 
+            ROUND(threshold_value, 2),
+            ', historical_avg=',
+            ROUND(COALESCE(avg_metric, 0), 2)
+        ) as message
+    FROM threshold_check
+    WHERE threshold_exceeded = 1
+""",
     
     'accepted_values': """
         -- Test: Accepted values constraint on {{ column_name }}
@@ -221,10 +222,11 @@ SQL_MACROS = {
     'custom_sql': """
         -- Test: Custom SQL validation
         {{ custom_sql }}
-    """,
+    """, 
     
     'freshness': """
         -- Test: Data freshness check
+        WITH freshness_check AS (
         SELECT 
             'data_freshness' as column_name,
             CASE 
@@ -240,7 +242,9 @@ SQL_MACROS = {
             ) as message
         FROM {{ schema }}.{{ model_name }}
         WHERE {{ column_name }} IS NOT NULL
-        HAVING failed_rows = 1
+        ) 
+        SELECT * FROM freshness_check
+        WHERE failed_rows = 1 --- freshness corrected
     """,
 
     'accepted_benchmark_values': """
@@ -259,7 +263,7 @@ SQL_MACROS = {
                 a.{{ column_name }},
                 a.actual_percentage,
                 CASE 
-                    {% for value, expected_pct in benchmark_values.items() %}
+                    {% for value, expected_pct in benchmark_values.items() %}   -----
                     WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
                     {% endfor %}
                     ELSE 0

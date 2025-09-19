@@ -1,11 +1,20 @@
-basic_example:
-  target: demo
+advanced_example:
+  target: dev
   outputs:
-    demo:
-      type: postgresql
-      host: postgres
-      port: 5432
-      user: qc2plus
-      password: qc2plus_password
-      dbname: qc2plus_demo
-      schema: demo
+    dev:
+      data_source:
+        type: postgresql
+        host: postgres-data
+        port: 5432
+        user: qc2plus
+        password: qc2plus_password
+        dbname: qc2plus_demo
+        schema: demo
+      quality_output:
+        type: postgresql 
+        host: postgres-results
+        port: 5432
+        user: qc2plus
+        password: qc2plus_password
+        dbname: qc2plus_results
+        schema: qc2plus_results

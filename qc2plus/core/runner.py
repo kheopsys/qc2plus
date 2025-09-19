@@ -46,10 +46,18 @@ class QC2PlusRunner:
         
         # Initialize alerting and persistence
         self.alert_manager = AlertManager(self.project.config.get('alerting', {}))
+
         self.persistence_manager = PersistenceManager(self.connection_manager)
-        
+                # Create quality tables ONCE during initialization
+        try:
+            self.connection_manager.create_quality_tables()
+            logging.info("Quality tables verified/created successfully")
+        except Exception as e:
+            logging.error(f"Failed to create quality tables: {str(e)}")
+            logging.warning("Continuing without persistence - results will not be saved to database")
+    
         # Ensure quality tables exist
-        self.connection_manager.create_quality_tables()
+        #self.persistence_manager.create_quality_tables_on_results() # Changed to results DB
     
     def run(self, models: Optional[List[str]] = None, level: str = 'all', 
             fail_fast: bool = False, threads: int = 1) -> Dict[str, Any]:

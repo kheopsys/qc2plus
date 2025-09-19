@@ -393,7 +393,7 @@ class AlertManager:
         """Create Slack payload for individual alert"""
         
         return {
-            "text": "CRITICAL: 2QC+ Test Failure",
+            "text": "🚨 CRITICAL: 2QC+ Test Failure",
             "attachments": [
                 {
                     "color": "danger",
@@ -412,6 +412,12 @@ class AlertManager:
     
     def _create_slack_summary_payload(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create Slack payload for summary alert"""
+        emoji_map = {
+        'critical': '🚨',
+        'high': '⚠️', 
+        'medium': '📊',
+        'low': '✅'
+        }
         
         color_map = {'critical': 'danger', 'high': 'warning', 'medium': 'good'}
         color = color_map.get(alert_data['severity'], 'good')
@@ -438,15 +444,15 @@ class AlertManager:
     
     def _create_teams_individual_payload(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create Microsoft Teams payload for individual alert"""
-        
+
         return {
             "@type": "MessageCard",
             "@context": "http://schema.org/extensions",
             "themeColor": "FF0000",
-            "summary": "Critical 2QC+ Test Failure",
+            "summary": "🚨 Critical 2QC+ Test Failure",
             "sections": [
                 {
-                    "activityTitle": "CRITICAL: 2QC+ Test Failure",
+                    "activityTitle": " 🚨 CRITICAL: 2QC+ Test Failure",
                     "activitySubtitle": f"Model: {alert_data['model']} | Test: {alert_data['test']}",
                     "facts": [
                         {"name": "Environment", "value": alert_data['target']},

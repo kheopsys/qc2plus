@@ -1,5 +1,5 @@
 """
-2QC+ Database Connection Manager
+2QC+ Database Connection Manager (CORRIGÉ FINAL)
 Supports PostgreSQL, Snowflake, BigQuery, Redshift
 """
 
@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 import pandas as pd
+import json
 
 
 class ConnectionManager:
@@ -16,193 +17,131 @@ class ConnectionManager:
     def __init__(self, profiles: Dict[str, Any], target: str):
         self.profiles = profiles
         self.target = target
-        self.engine: Optional[Engine] = None
+        self.data_engine: Optional[Engine] = None
+        self.quality_engine: Optional[Engine] = None
         self.db_type: Optional[str] = None
+        self.quality_db_type: Optional[str] = None
         
         # Get target configuration
-        profile_name = list(profiles.keys())[0]  # Assume first profile for now
+        profile_name = list(profiles.keys())[0]
         profile = profiles[profile_name]
         
         if target not in profile['outputs']:
             raise ValueError(f"Target '{target}' not found in profiles")
             
-        self.config = profile['outputs'][target]
-        self.db_type = self.config['type']
+        self.target_config = profile['outputs'][target]
         
-        # Initialize connection
-        self._create_engine()
+        # Support both old format (single DB) and new format (separated DBs)
+        if 'data_source' in self.target_config:
+            # New format: separated databases
+            self.data_config = self.target_config['data_source']
+            self.quality_config = self.target_config['quality_output']
+            self.db_type = self.data_config['type']
+            self.quality_db_type = self.quality_config['type']
+        else:
+            # Old format: single database for both data and quality
+            self.data_config = self.target_config
+            self.quality_config = self.target_config
+            self.db_type = self.target_config['type']
+            self.quality_db_type = self.target_config['type']
+        
+        # Initialize connections
+        self._create_engines()
     
-    def _create_engine(self) -> None:
-        """Create SQLAlchemy engine based on database type"""
+    def _create_engines(self) -> None:
+        """Create SQLAlchemy engines for both data and quality databases"""
         try:
-            if self.db_type == 'postgresql':
-                self.engine = self._create_postgresql_engine()
-            elif self.db_type == 'snowflake':
-                self.engine = self._create_snowflake_engine()
-            elif self.db_type == 'bigquery':
-                self.engine = self._create_bigquery_engine()
-            elif self.db_type == 'redshift':
-                self.engine = self._create_redshift_engine()
+            # Create data source engine
+            self.data_engine = self._create_engine(self.data_config, self.db_type)
+            
+            # Create quality output engine
+            if self.data_config == self.quality_config:
+                # Same database, reuse connection
+                self.quality_engine = self.data_engine
             else:
-                raise ValueError(f"Unsupported database type: {self.db_type}")
+                # Different database, create separate connection
+                self.quality_engine = self._create_engine(self.quality_config, self.quality_db_type)
                 
         except Exception as e:
-            logging.error(f"Failed to create database engine: {str(e)}")
+            logging.error(f"Failed to create database engines: {str(e)}")
             raise
     
-    def _create_postgresql_engine(self) -> Engine:
-        """Create PostgreSQL engine"""
-        connection_string = (
-            f"postgresql://{self.config['user']}:{self.config['password']}"
-            f"@{self.config['host']}:{self.config['port']}"
-            f"/{self.config['dbname']}"
-        )
-        return create_engine(connection_string)
-    
-    def _create_snowflake_engine(self) -> Engine:
-        """Create Snowflake engine"""
-        try:
-            from snowflake.sqlalchemy import URL
-        except ImportError:
-            raise ImportError("snowflake-sqlalchemy package required for Snowflake connections")
-            
-        connection_string = URL(
-            account=self.config['account'],
-            user=self.config['user'],
-            password=self.config['password'],
-            database=self.config['database'],
-            schema=self.config['schema'],
-            warehouse=self.config['warehouse'],
-            role=self.config.get('role')
-        )
-        return create_engine(connection_string)
-    
-    def _create_bigquery_engine(self) -> Engine:
-        """Create BigQuery engine"""
-        try:
-            from sqlalchemy_bigquery import BigQueryDialect
-        except ImportError:
-            raise ImportError("sqlalchemy-bigquery package required for BigQuery connections")
-            
-        if self.config.get('method') == 'service-account':
-            connection_string = (
-                f"bigquery://{self.config['project']}/{self.config['dataset']}"
-                f"?credentials_path={self.config['keyfile']}"
-            )
+    def _create_engine(self, config: Dict[str, Any], db_type: str) -> Engine:
+        """Create SQLAlchemy engine based on database type and config"""
+        if db_type == 'postgresql':
+            return self._create_postgresql_engine(config)
+        elif db_type == 'snowflake':
+            return self._create_snowflake_engine(config)
+        elif db_type == 'bigquery':
+            return self._create_bigquery_engine(config)
+        elif db_type == 'redshift':
+            return self._create_redshift_engine(config)
         else:
-            # OAuth method
-            connection_string = f"bigquery://{self.config['project']}/{self.config['dataset']}"
-            
-        return create_engine(connection_string)
+            raise ValueError(f"Unsupported database type: {db_type}")
     
-    def _create_redshift_engine(self) -> Engine:
-        """Create Redshift engine"""
-        connection_string = (
-            f"redshift+psycopg2://{self.config['user']}:{self.config['password']}"
-            f"@{self.config['host']}:{self.config['port']}"
-            f"/{self.config['dbname']}"
-        )
-        return create_engine(connection_string)
-    
-    def test_connection(self) -> bool:
-        """Test database connection"""
-        try:
-            with self.engine.connect() as conn:
-                # Simple query to test connection
-                if self.db_type == 'bigquery':
-                    result = conn.execute(text("SELECT 1 as test"))
-                else:
-                    result = conn.execute(text("SELECT 1"))
-                
-                # Fetch result to ensure query executes
-                result.fetchone()
-                return True
-                
-        except Exception as e:
-            logging.error(f"Connection test failed: {str(e)}")
-            return False
-    
-    def execute_query(self, query: str) -> pd.DataFrame:
+    def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None, use_data_source: bool = True) -> pd.DataFrame:
         """Execute a query and return results as DataFrame"""
         try:
-            with self.engine.connect() as conn:
-                return pd.read_sql(text(query), conn)
+            engine = self.data_engine if use_data_source else self.quality_engine
+            with engine.connect() as conn:
+                if params:
+                    clean_params = json.loads(json.dumps(params, default=str))
+                    return pd.read_sql(text(query), conn, params=clean_params)
+                else:
+    
+                    return pd.read_sql(text(query), conn)
         except Exception as e:
             logging.error(f"Query execution failed: {str(e)}")
             raise
     
-    def execute_sql(self, sql: str, params: dict = None) -> Any:
+    def execute_sql(self, sql: str, params: Optional[Dict[str, Any]] = None, use_data_source: bool = False) -> Any:
         """Execute SQL statement (for non-SELECT queries)"""
         try:
-            with self.engine.connect() as conn:
+            # Quality operations (INSERT/UPDATE/DELETE) go to quality DB by default
+            # Data operations use data source
+            engine = self.data_engine if use_data_source else self.quality_engine
+            
+            with engine.begin() as conn:  # Use begin() for auto-commit
                 if params:
-                    result = conn.execute(text(sql), params)
+                    clean_params = dict(params) if params else {}
+                    result = conn.execute(text(sql), clean_params)
                 else:
                     result = conn.execute(text(sql))
-                conn.commit()
                 return result
         except Exception as e:
             logging.error(f"SQL execution failed: {str(e)}")
             raise
     
-    def get_table_info(self, table_name: str, schema: str = None) -> Dict[str, Any]:
-        """Get table information (columns, types, etc.)"""
-        schema = schema or self.config.get('schema', 'public')
-        
-        if self.db_type == 'postgresql':
-            query = """
-                SELECT column_name, data_type, is_nullable
-                FROM information_schema.columns
-                WHERE table_name = %(table_name)s
-                AND table_schema = %(schema)s
-                ORDER BY ordinal_position
-            """
-        elif self.db_type == 'snowflake':
-            query = """
-                SELECT column_name, data_type, is_nullable
-                FROM information_schema.columns
-                WHERE table_name = %(table_name)s
-                AND table_schema = %(schema)s
-                ORDER BY ordinal_position
-            """
-        elif self.db_type == 'bigquery':
-            query = f"""
-                SELECT column_name, data_type, is_nullable
-                FROM `{self.config['project']}.{schema}.INFORMATION_SCHEMA.COLUMNS`
-                WHERE table_name = @table_name
-                ORDER BY ordinal_position
-            """
-        elif self.db_type == 'redshift':
-            query = """
-                SELECT column_name, data_type, is_nullable
-                FROM information_schema.columns
-                WHERE table_name = %(table_name)s
-                AND table_schema = %(schema)s
-                ORDER BY ordinal_position
-            """
-        else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
-        
+    def test_connection(self) -> bool:
+        """Test both database connections"""
         try:
-            if self.db_type == 'bigquery':
-                # BigQuery uses named parameters differently
-                df = self.execute_query(query.replace('@table_name', f"'{table_name}'"))
-            else:
-                df = self.execute_query(query % {'table_name': table_name, 'schema': schema})
+            # Test data source connection
+            with self.data_engine.connect() as conn:
+                if self.db_type == 'bigquery':
+                    result = conn.execute(text("SELECT 1 as test"))
+                else:
+                    result = conn.execute(text("SELECT 1"))
+                result.fetchone()
             
-            return {
-                'columns': df.to_dict('records'),
-                'column_count': len(df),
-                'table_name': table_name,
-                'schema': schema
-            }
+            # Test quality database connection (if different)
+            if self.data_engine != self.quality_engine:
+                with self.quality_engine.connect() as conn:
+                    if self.quality_db_type == 'bigquery':
+                        result = conn.execute(text("SELECT 1 as test"))
+                    else:
+                        result = conn.execute(text("SELECT 1"))
+                    result.fetchone()
+                    
+            return True
+                
         except Exception as e:
-            logging.error(f"Failed to get table info for {schema}.{table_name}: {str(e)}")
-            return {'columns': [], 'column_count': 0, 'table_name': table_name, 'schema': schema}
+            logging.error(f"Connection test failed: {str(e)}")
+            return False
     
     def create_quality_tables(self) -> None:
-        """Create quality monitoring tables for Power BI integration"""
-        schema = self.config.get('schema', 'public')
+        """Create quality monitoring tables in the quality database"""
+        # CORRECTION : Utiliser quality_config au lieu de data_config
+        schema = self.quality_config.get('schema', 'public')
         
         # Table 1: quality_test_results
         quality_test_results_sql = f"""
@@ -255,38 +194,130 @@ class ConnectionManager:
             )
         """
         
-        # Adapt SQL for different databases
-        if self.db_type == 'bigquery':
-            quality_test_results_sql = quality_test_results_sql.replace('VARCHAR(255)', 'STRING')
-            quality_test_results_sql = quality_test_results_sql.replace('VARCHAR(50)', 'STRING')
-            quality_test_results_sql = quality_test_results_sql.replace('VARCHAR(20)', 'STRING')
-            quality_test_results_sql = quality_test_results_sql.replace('VARCHAR(10)', 'STRING')
-            quality_test_results_sql = quality_test_results_sql.replace('TEXT', 'STRING')
-            quality_test_results_sql = quality_test_results_sql.replace('INTEGER', 'INT64')
-            quality_test_results_sql = quality_test_results_sql.replace('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP()')
-            
-            quality_run_summary_sql = quality_run_summary_sql.replace('VARCHAR(255)', 'STRING')
-            quality_run_summary_sql = quality_run_summary_sql.replace('VARCHAR(50)', 'STRING')
-            quality_run_summary_sql = quality_run_summary_sql.replace('VARCHAR(20)', 'STRING')
-            quality_run_summary_sql = quality_run_summary_sql.replace('INTEGER', 'INT64')
-            quality_run_summary_sql = quality_run_summary_sql.replace('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP()')
-            
-            quality_anomalies_sql = quality_anomalies_sql.replace('VARCHAR(255)', 'STRING')
-            quality_anomalies_sql = quality_anomalies_sql.replace('VARCHAR(50)', 'STRING')
-            quality_anomalies_sql = quality_anomalies_sql.replace('VARCHAR(100)', 'STRING')
-            quality_anomalies_sql = quality_anomalies_sql.replace('VARCHAR(20)', 'STRING')
-            quality_anomalies_sql = quality_anomalies_sql.replace('TEXT', 'STRING')
-            quality_anomalies_sql = quality_anomalies_sql.replace('DECIMAL(10,4)', 'FLOAT64')
-            quality_anomalies_sql = quality_anomalies_sql.replace('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP()')
+        # Adapt SQL for BigQuery
+        if self.quality_db_type == 'bigquery':
+            quality_test_results_sql = self._adapt_sql_for_bigquery(quality_test_results_sql)
+            quality_run_summary_sql = self._adapt_sql_for_bigquery(quality_run_summary_sql)
+            quality_anomalies_sql = self._adapt_sql_for_bigquery(quality_anomalies_sql)
         
         try:
-            self.execute_sql(quality_test_results_sql)
-            self.execute_sql(quality_run_summary_sql)
-            self.execute_sql(quality_anomalies_sql)
-            logging.info("Quality monitoring tables created successfully")
+            # CORRECTION : Utiliser quality_engine avec begin()
+            with self.quality_engine.begin() as conn:
+                conn.execute(text(quality_test_results_sql))
+                conn.execute(text(quality_run_summary_sql))
+                conn.execute(text(quality_anomalies_sql))
+            logging.info(f"Quality monitoring tables created successfully in schema: {schema}")
         except Exception as e:
             logging.error(f"Failed to create quality tables: {str(e)}")
             raise
+    
+    def _adapt_sql_for_bigquery(self, sql: str) -> str:
+        """Adapt SQL for BigQuery"""
+        sql = sql.replace('VARCHAR(255)', 'STRING')
+        sql = sql.replace('VARCHAR(50)', 'STRING')
+        sql = sql.replace('VARCHAR(20)', 'STRING')
+        sql = sql.replace('VARCHAR(10)', 'STRING')
+        sql = sql.replace('VARCHAR(100)', 'STRING')
+        sql = sql.replace('TEXT', 'STRING')
+        sql = sql.replace('INTEGER', 'INT64')
+        sql = sql.replace('DECIMAL(10,4)', 'FLOAT64')
+        sql = sql.replace('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP()')
+        return sql
+    
+    @property 
+    def config(self):
+        """Return data source config for backward compatibility"""
+        return self.data_config
+    
+    def _create_postgresql_engine(self, config: Dict[str, Any]) -> Engine:
+        """Create PostgreSQL engine"""
+        # CORRECTION : Utiliser le paramètre config au lieu de self.config
+        connection_string = (
+            f"postgresql://{config['user']}:{config['password']}"
+            f"@{config['host']}:{config['port']}"
+            f"/{config['dbname']}"
+        )
+        return create_engine(connection_string)
+    
+    def _create_snowflake_engine(self, config: Dict[str, Any]) -> Engine:
+        """Create Snowflake engine"""
+        try:
+            from snowflake.sqlalchemy import URL
+        except ImportError:
+            raise ImportError("snowflake-sqlalchemy package required for Snowflake connections")
+            
+        connection_string = URL(
+            account=config['account'],
+            user=config['user'],
+            password=config['password'],
+            database=config['database'],
+            schema=config['schema'],
+            warehouse=config['warehouse'],
+            role=config.get('role')
+        )
+        return create_engine(connection_string)
+    
+    def _create_bigquery_engine(self, config: Dict[str, Any]) -> Engine:
+        """Create BigQuery engine"""
+        try:
+            from sqlalchemy_bigquery import BigQueryDialect
+        except ImportError:
+            raise ImportError("sqlalchemy-bigquery package required for BigQuery connections")
+            
+        if config.get('method') == 'service-account':
+            connection_string = (
+                f"bigquery://{config['project']}/{config['dataset']}"
+                f"?credentials_path={config['keyfile']}"
+            )
+        else:
+            connection_string = f"bigquery://{config['project']}/{config['dataset']}"
+            
+        return create_engine(connection_string)
+    
+    def _create_redshift_engine(self, config: Dict[str, Any]) -> Engine:
+        """Create Redshift engine"""
+        connection_string = (
+            f"redshift+psycopg2://{config['user']}:{config['password']}"
+            f"@{config['host']}:{config['port']}"
+            f"/{config['dbname']}"
+        )
+        return create_engine(connection_string)
+    
+    def get_table_info(self, table_name: str, schema: str = None) -> Dict[str, Any]:
+        """Get table information (columns, types, etc.)"""
+        schema = schema or self.config.get('schema', 'public')
+        
+        if self.db_type == 'postgresql':
+            query = """
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_name = %(table_name)s
+                AND table_schema = %(schema)s
+                ORDER BY ordinal_position
+            """
+            params = {'table_name': table_name, 'schema': schema}
+        elif self.db_type == 'bigquery':
+            query = f"""
+                SELECT column_name, data_type, is_nullable
+                FROM `{self.config['project']}.{schema}.INFORMATION_SCHEMA.COLUMNS`
+                WHERE table_name = '{table_name}'
+                ORDER BY ordinal_position
+            """
+            params = None
+        else:
+            raise ValueError(f"Unsupported database type: {self.db_type}")
+        
+        try:
+            df = self.execute_query(query, params, use_data_source=True)
+            return {
+                'columns': df.to_dict('records'),
+                'column_count': len(df),
+                'table_name': table_name,
+                'schema': schema
+            }
+        except Exception as e:
+            logging.error(f"Failed to get table info for {schema}.{table_name}: {str(e)}")
+            return {'columns': [], 'column_count': 0, 'table_name': table_name, 'schema': schema}
     
     def get_db_adapter(self) -> 'DatabaseAdapter':
         """Get database-specific adapter for SQL generation"""
@@ -322,7 +353,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
     """PostgreSQL-specific SQL adaptations"""
     
     def adapt_regex(self, pattern: str) -> str:
-        return f"{pattern}"
+        return pattern
+        #return f"~ '{pattern}'"
     
     def adapt_date_functions(self, sql: str) -> str:
         sql = sql.replace('DATE_DIFF', 'DATE_PART')

@@ -8,4 +8,4 @@ basic_example:
       user: qc2plus
       password: qc2plus_password
       dbname: qc2plus_demo
-      schema: basic_demo
+      schema: demo   # Schéma par défaut est demo (créé par init_tables.sql )

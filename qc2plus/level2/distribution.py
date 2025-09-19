@@ -50,7 +50,11 @@ class DistributionAnalyzer:
             
             # Perform ONLY the 2 key analyses
             anomalies = self._detect_segment_anomalies(reference_data, comparison_data, segments, metrics)
-            
+
+            #printing anomalies for debug added
+            if anomalies:
+                logging.info(f"Distribution anomalies detected for {model_name}: {anomalies}")
+                        
             return {
                 'passed': len(anomalies) == 0,
                 'anomalies_count': len(anomalies),
@@ -97,9 +101,10 @@ class DistributionAnalyzer:
         if period_type == 'comparison':
             date_condition = f"{date_column} >= CURRENT_DATE - INTERVAL '{reference_period} days'"
         else:  # reference
-            comparison_period = comparison_period + reference_period
+            total_days = comparison_period + reference_period
             date_condition = f"""
-                {date_column} >= CURRENT_DATE - INTERVAL '{comparison_period} days' 
+                {date_column} >= CURRENT_DATE - INTERVAL '{total_days} days' 
+                AND {date_column} < CURRENT_DATE - INTERVAL '{comparison_period} days'
             """
         
         query = f"""
@@ -121,7 +126,9 @@ class DistributionAnalyzer:
         elif self.connection_manager.db_type == 'snowflake':
             query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
             query = query.replace(" days'", " DAY'")
-        
+
+        data = self.connection_manager.execute_query(query)
+
         return self.connection_manager.execute_query(query)
     
     def _detect_segment_anomalies(self, reference_data: pd.DataFrame, comparison_data: pd.DataFrame,
