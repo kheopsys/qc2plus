@@ -8,7 +8,7 @@ log-path: "logs"
 
 
 alerting:
-  enabled_channels: [""]  #, "teams"
+  enabled_channels: ["slack"]  #emails functionnel, "teams"
   slack:
     enabled: true
     webhook_url: "https://hooks.slack.com/services/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" #"${SLACK_WEBHOOK_URL}"
@@ -23,4 +23,8 @@ alerting:
     from_email: "iettiache@kheopsys.com"
     to_emails:
       - "ikramettiache12@gmail.com"
-      - "agambo@kheopsys.com"
+
+
+
+
+

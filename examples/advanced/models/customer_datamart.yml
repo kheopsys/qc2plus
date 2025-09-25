@@ -38,10 +38,10 @@ models:
                   FROM demo.customer_datamart 
                   WHERE customer_segment = 'VIP-buyer'
                   HAVING COUNT(*) > 5
-            severity: medium
+            severity: critical
       level2:
         correlation_analysis:
-          variables: [lifetime_value, order_frequency,customer_id]
+          variables: [lifetime_value, customer_id]
           expected_correlation: 0.7
           threshold: 0.3
 

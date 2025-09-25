@@ -56,10 +56,20 @@ class Level1Engine:
         
         # Generate SQL for the test
         sql = self.compile_test(test_type, test_params, model_name)
+
+        # Prepare base result with new fields
+        base_result = {
+            'query': sql,  # NOUVEAU : SQL query utilisée
+            'explanation': self._get_test_explanation(test_type, test_params),  # NOUVEAU : Explication humaine
+            'examples': [],  # NOUVEAU : Sera rempli avec des exemples d'erreurs
+            'severity': test_params.get('severity', 'medium')
+        }
+    
         
         if not self.connection_manager:
             # If no connection manager, return compilation result
             return {
+                **base_result,
                 'passed': True,
                 'sql': sql,
                 'severity': test_params.get('severity', 'medium'),
@@ -74,6 +84,7 @@ class Level1Engine:
             if len(df) == 0:
                 # No results means test passed (no violations found)
                 return {
+                    **base_result,
                     'passed': True,
                     'failed_rows': 0,
                     'total_rows': 0,
@@ -84,8 +95,12 @@ class Level1Engine:
                 # Results found means test failed (violations detected)
                 failed_rows = df.iloc[0].get('failed_rows', len(df))
                 total_rows = df.iloc[0].get('total_rows', failed_rows)
-                
+                # NOUVEAU : Extraire des exemples d'erreurs du DataFrame
+                examples = self._extract_examples_from_results(df, test_type, test_params)
+
                 return {
+                    **base_result,
+                    'examples': df.head(5).to_dict(orient='records'),  # NOUVEAU : Exemples d'erreurs
                     'passed': False,
                     'failed_rows': int(failed_rows),
                     'total_rows': int(total_rows),
@@ -95,6 +110,7 @@ class Level1Engine:
                 
         except Exception as e:
             return {
+                **base_result,
                 'passed': False,
                 'error': str(e),
                 'severity': test_params.get('severity', 'medium'),
@@ -313,3 +329,83 @@ class Level1Engine:
                     issues.append("threshold must be a number between 0 and 1")
         
         return issues
+    def _get_test_explanation(self, test_type: str, test_params: Dict[str, Any]) -> str:
+        """Generate human-readable explanation for a test"""
+        
+        explanations = {
+            'unique': f"Verifies that column '{test_params.get('column_name', 'N/A')}' contains only unique values. Duplicates may indicate data entry errors or process issues.",
+            
+            'not_null': f"Verifies that column '{test_params.get('column_name', 'N/A')}' contains no empty (NULL) values. Missing values can compromise data integrity.",
+            
+            'email_format': f"Verifies that column '{test_params.get('column_name', 'N/A')}' contains valid email addresses in name@domain.com format. Values like 'Lyon' or 'Paris' are not valid emails.",
+            
+            'relationship': f"Verifies referential integrity between column '{test_params.get('column_name', 'N/A')}' and reference table '{test_params.get('reference_table', 'N/A')}'. Each value must exist in the reference table.",
+            
+            'future_date': f"Verifies that column '{test_params.get('column_name', 'N/A')}' does not contain future dates. Future dates may indicate data entry errors or synchronization issues.",
+            
+            'accepted_values': f"Verifies that column '{test_params.get('column_name', 'N/A')}' contains only authorized values. Non-compliant values may indicate data entry errors.",
+            
+            'statistical_threshold': f"Verifies that metric '{test_params.get('metric', 'N/A')}' respects statistical thresholds based on the last {test_params.get('window_days', 30)} days of historical data.",
+            
+            'accepted_benchmark_values': f"Verifies that the distribution of values in '{test_params.get('column_name', 'N/A')}' matches expected reference percentages with a tolerance of {test_params.get('threshold', 0)*100}%.",
+            
+            'freshness': f"Verifies that data in column '{test_params.get('column_name', 'N/A')}' is not too old (more than {test_params.get('max_age_days', 'N/A')} days)."
+        }
+        
+        return explanations.get(test_type, f"Test de qualité de type '{test_type}' sur le modèle de données.")
+    
+    def _extract_examples_from_results(self, df: pd.DataFrame, test_type: str, test_params: Dict[str, Any]) -> List[str]:
+        """Extract examples of errors from test results"""
+        
+        examples = []
+        max_examples = 10  # Limiter à 10 exemples
+        
+        try:
+            # Pour les différents types de tests, extraire les exemples appropriés
+            if test_type in ['unique', 'not_null', 'email_format', 'future_date']:
+                # Ces tests retournent généralement les valeurs problématiques
+                column_name = test_params.get('column_name', '')
+                
+                if column_name in df.columns:
+                    # Prendre les valeurs uniques pour éviter la répétition
+                    unique_values = df[column_name].dropna().unique()[:max_examples]
+                    examples = [str(val) for val in unique_values]
+                
+                elif 'invalid_value' in df.columns:
+                    # Si le query retourne une colonne 'invalid_value'
+                    unique_values = df['invalid_value'].dropna().unique()[:max_examples]
+                    examples = [str(val) for val in unique_values]
+                
+                elif len(df.columns) > 0:
+                    # Prendre la première colonne disponible
+                    first_col = df.columns[0]
+                    unique_values = df[first_col].dropna().unique()[:max_examples]
+                    examples = [str(val) for val in unique_values]
+            
+            elif test_type == 'relationship':
+                # Pour les tests de relation, montrer les clés orphelines
+                column_name = test_params.get('column_name', '')
+                if column_name in df.columns:
+                    unique_values = df[column_name].dropna().unique()[:max_examples]
+                    examples = [f"ID orphelin: {val}" for val in unique_values]
+            
+            elif test_type == 'accepted_benchmark_values':
+                # Pour les tests de benchmark, montrer les distributions actuelles vs attendues
+                if 'value' in df.columns and 'actual_pct' in df.columns and 'expected_pct' in df.columns:
+                    for _, row in df.head(max_examples).iterrows():
+                        examples.append(f"{row['value']}: {row['actual_pct']:.1f}% (attendu: {row['expected_pct']:.1f}%)")
+            
+            elif test_type == 'statistical_threshold':
+                # Pour les tests statistiques, montrer les métriques
+                if 'current_value' in df.columns and 'threshold_value' in df.columns:
+                    row = df.iloc[0]
+                    examples.append(f"Valeur actuelle: {row['current_value']}, Seuil: {row['threshold_value']}")
+        
+        except Exception as e:
+            logging.warning(f"Could not extract examples for test {test_type}: {str(e)}")
+            # Fallback : essayer de prendre les premières valeurs du DataFrame
+            if len(df) > 0 and len(df.columns) > 0:
+                first_col = df.columns[0]
+                examples = [str(val) for val in df[first_col].head(max_examples).tolist()]
+        
+        return examples

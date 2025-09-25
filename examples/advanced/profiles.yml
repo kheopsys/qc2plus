@@ -4,12 +4,14 @@ advanced_example:
     dev:
       data_source:
         type: postgresql
-        host: postgres-data
+        host: postgres-data #{152.252.32.23}
         port: 5432
         user: qc2plus
         password: qc2plus_password
         dbname: qc2plus_demo
         schema: demo
+
+
       quality_output:
         type: postgresql 
         host: postgres-results

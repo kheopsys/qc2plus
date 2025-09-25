@@ -92,10 +92,18 @@ class PersistenceManager:
                             'failed_rows': test_result.get('failed_rows', 0),
                             'total_rows': test_result.get('total_rows', 0),
                             'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown')
+                            'target_environment': results.get('target', 'unknown'),
+                                                   # NOUVEAUX CHAMPS :
+                            'explanation': test_result.get('explanation', ''),
+                            'examples': json.dumps(test_result.get('examples', [])) if test_result.get('examples') else '',
+                            'query': test_result.get('query', '')
                         }
                         test_records.append(record)
                 
+
+
+
+
                 # Level 2 test results
                 for analyzer_name, analyzer_result in model_results.get('level2', {}).items():
                     if isinstance(analyzer_result, dict):
@@ -111,7 +119,13 @@ class PersistenceManager:
                             'failed_rows': analyzer_result.get('anomalies_count', 0),
                             'total_rows': 1,  # Level 2 tests are typically binary pass/fail
                             'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown')
+                            'target_environment': results.get('target', 'unknown'),
+                        
+                            'explanation': f"Analysis of anomalies type : {analyzer_name}",
+                            'examples': '',
+                            'query': ''
+                            
+                        
                         }
                         test_records.append(record)
             

@@ -35,7 +35,6 @@ services:
       - POSTGRES_PASSWORD=qc2plus_password
     volumes:
       - postgres_results_data:/var/lib/postgresql/data
-      - ./examples/data/init_results_tables.sql:/docker-entrypoint-initdb.d/01_init_results.sql
     ports:
       - "5433:5432"
     networks:

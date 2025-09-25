@@ -80,7 +80,10 @@ class AlertManager:
                         'severity': severity,
                         'message': test_result.get('message', ''),
                         'failed_rows': test_result.get('failed_rows', 0),
-                        'total_rows': test_result.get('total_rows', 0)
+                        'total_rows': test_result.get('total_rows', 0),
+                        'explanation': test_result.get('explanation', ''), 
+                        'examples': test_result.get('examples', []),      
+                        'query': test_result.get('query', '')               
                     }
                     
                     if severity == 'critical':
@@ -89,21 +92,41 @@ class AlertManager:
                         high_failures.append(failure_info)
                     else:
                         medium_failures.append(failure_info)
-            
+
             # Level 2 failures (anomalies)
             for analyzer_name, analyzer_result in model_results.get('level2', {}).items():
                 if not analyzer_result.get('passed', True):
                     anomalies_count = analyzer_result.get('anomalies_count', 0)
+
                     if anomalies_count > 0:
+                        print(f"DEBUG: Level 2 anomaly - analyzer: {analyzer_name}, severity: {self._determine_level2_severity(analyzer_result, anomalies_count)}")
+
                         failure_info = {
                             'model': model_name,
                             'test': analyzer_name,
                             'type': 'level2',
-                            'severity': 'medium',  # Level 2 anomalies are typically medium severity
+                            'severity': "medium",  # Temporarily set to medium for testing
+                            #self._determine_level2_severity(analyzer_result, anomalies_count),  # Level 2 anomalies are typically medium severity
                             'message': analyzer_result.get('message', ''),
+                            'anomalies_count': anomalies_count,  
+
+                            # AJOUTEZ CES LIGNES :
+                            'failed_rows': anomalies_count,
+                            'total_rows': 1,    # Level 2 tests are typically binary pass/fail  
+                            'explanation': self._get_level2_explanation(analyzer_name, analyzer_result),
+                            'examples': self._extract_level2_examples(analyzer_result),
+                            'query': '',  # Level 2 doesn't use SQL queries
                             'anomalies_count': anomalies_count
                         }
-                        medium_failures.append(failure_info)
+
+                        severity = failure_info['severity']
+                        if severity == 'critical':
+                            critical_failures.append(failure_info)
+                        elif severity == 'high':
+                            high_failures.append(failure_info)
+                        else:
+                            medium_failures.append(failure_info)
+                        
         
         # Determine alerting needs
         total_failures = len(critical_failures) + len(high_failures) + len(medium_failures)
@@ -131,14 +154,22 @@ class AlertManager:
         for failure in critical_failures:
             alert_data = {
                 'alert_type': 'individual',
-                'severity': 'critical',
+                'severity': failure['severity'],
                 'model': failure['model'],
                 'test': failure['test'],
                 'message': failure['message'],
                 'timestamp': datetime.now().isoformat(),
-                'run_id': results.get('run_id', ''),
-                'target': results.get('target', '')
-            }
+                'run_id': results.get('run_id', ''),   
+                'target': results.get('target', ''),
+               #'failed_rows': failure['failed_rows'],
+                #'total_rows': failure.get('total_rows', 0),
+                'explanation': failure.get('explanation', 'No explication available'),
+                'examples': failure.get('examples', []),
+                'query': failure.get('query', ''),
+                'failed_rows': failure.get('failed_rows', 0),
+                'total_rows': failure.get('total_rows', 0),
+                'test_type': failure.get('type', '')
+                }
             
             # Send to enabled channels
             if 'email' in self.enabled_channels:
@@ -152,7 +183,7 @@ class AlertManager:
     
     def _send_summary_alert(self, alert_info: Dict[str, Any], results: Dict[str, Any]) -> None:
         """Send summary alert with overall results"""
-        
+        failure_details = self._collect_failure_details(alert_info, results)
         alert_data = {
             'alert_type': 'summary',
             'severity': self._determine_summary_severity(alert_info),
@@ -167,7 +198,8 @@ class AlertManager:
             'medium_failures': len(alert_info['medium_failures']),
             'failure_rate': alert_info['failure_rate'],
             'execution_duration': results.get('execution_duration', 0),
-            'model_count': len(results.get('models', {}))
+            'model_count': len(results.get('models', {})),
+            'failure_details': failure_details    # AJOUTÉ
         }
         
         # Send to enabled channels
@@ -390,25 +422,43 @@ class AlertManager:
         """
     
     def _create_slack_individual_payload(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create Slack payload for individual alert"""
-        
-        return {
-            "text": "🚨 CRITICAL: 2QC+ Test Failure",
-            "attachments": [
-                {
-                    "color": "danger",
-                    "fields": [
-                        {"title": "Model", "value": alert_data['model'], "short": True},
-                        {"title": "Test", "value": alert_data['test'], "short": True},
-                        {"title": "Environment", "value": alert_data['target'], "short": True},
-                        {"title": "Run ID", "value": alert_data['run_id'], "short": True},
-                        {"title": "Error", "value": alert_data['message'], "short": False}
-                    ],
-                    "footer": "2QC Plus Data Quality Framework",
-                    "ts": int(datetime.now().timestamp())
-                }
+            """Create Slack payload for individual alert"""
+            test_type_display = "Level 1" if alert_data.get('test_type') == 'level1' else "Level 2"
+
+            fields = [
+                {"title": "Model", "value": alert_data['model'], "short": True},
+                {"title": "Test", "value": alert_data['test'], "short": True},
+                {"title": "Environment", "value": alert_data['target'], "short": True},
+                {"title": "Test Type", "value": test_type_display, "short": True},
+                {"title": "Failed/Total", "value": f"{alert_data.get('failed_rows', 0)}/{alert_data.get('total_rows', 0)}", "short": True},
+                {"title": "Run ID", "value": alert_data['run_id'], "short": True},
+                {"title": "Error", "value": alert_data['message'], "short": False}
             ]
-        }
+            
+            if alert_data.get('explanation'):
+                fields.append({"title": "Test Definition", "value": alert_data['explanation'], "short": False})
+            
+            if alert_data.get('examples'):
+                examples_text = "\n".join([f"• {ex}" for ex in alert_data['examples'][:3]])
+                fields.append({"title": "Fail cause", "value": examples_text, "short": False})
+            
+            if alert_data.get('query') and alert_data.get('test_type') == 'level1':
+                query_text = alert_data['query'][:500] + ("..." if len(alert_data['query']) > 500 else "")
+                fields.append({"title": "Query", "value": f"```sql\n{query_text}\n```", "short": False})
+            severity_text = alert_data['severity'].upper()
+            emoji_map = {'critical': '🚨', 'high': '⚠️', 'medium': '📊'}
+            emoji = emoji_map.get(alert_data['severity'], '⚠️')
+            return {
+                "text": f"{emoji} {severity_text}: 2QC+ Test Failure ON MODEL {alert_data['model'].upper()}", 
+                "attachments": [
+                    {
+                        "color": "danger",
+                        "fields": fields,
+                        "footer": "2QC Plus Data Quality Framework",
+                        "ts": int(datetime.now().timestamp())
+                    }
+                ]
+            }
     
     def _create_slack_summary_payload(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create Slack payload for summary alert"""
@@ -423,7 +473,127 @@ class AlertManager:
         color = color_map.get(alert_data['severity'], 'good')
         
         success_rate = (alert_data['passed_tests'] / max(alert_data['total_tests'], 1)) * 100
+
+
+        fields = [
+        {"title": "📊 Total Tests", "value": str(alert_data['total_tests']), "short": True},
+        {"title": "✅ Success Rate", "value": f"{success_rate:.1f}%", "short": True},
+        {"title": "🚨 Critical", "value": str(alert_data['critical_failures']), "short": True},
+        {"title": "⚠️ High", "value": str(alert_data['high_failures']), "short": True},
+        {"title": "📋 Medium", "value": str(alert_data['medium_failures']), "short": True},
+        {"title": "⏱️ Duration", "value": f"{alert_data['execution_duration']}", "short": True},
+        {"title": "🔍 Run ID", "value": alert_data['run_id'], "short": False}
+    ]
+
+        failure_details = alert_data.get('failure_details', {})
+        level1_failures = failure_details.get('level1_failures', [])
+        level2_anomalies = failure_details.get('level2_anomalies', [])
+        #        level2_details = alert_data.get('level2_details', {})
+        #level2_anomalies = level2_details.get('anomalies', [])
         
+        if level1_failures:
+            failures_summary = []
+            for failure in level1_failures[:3]:
+                summary_line = f"• **{failure['model']}.{failure['test']}**: {failure['failed_rows']}/{failure['total_rows']} failed"
+                failures_summary.append(summary_line)
+            fields.append({
+                "title": "Level 1 Failed Tests", 
+                "value": "\n".join(failures_summary),
+                "short": False
+            })
+            for failure in level1_failures[:2]:  # Limite à 2 au lieu de 3
+                details = f"**Issue**: {failure['message']}\n"
+                if failure.get('explanation'):
+                    details += f"**Rule**: {failure['explanation'][:80]}...\n"
+                if failure.get('examples') and len(failure['examples']) > 0:
+                    example = str(failure['examples'][0]).replace("'", "").replace("{", "").replace("}", "")
+                    details += f"**Example**: {example[:70]}..."
+                
+                fields.append({
+                    "title": f"Details: {failure['model']}.{failure['test']}",
+                    "value": details,
+                    "short": True  # Côte à côte pour économiser l'espace
+                })
+            """
+            for failure in level1_failures[:3]:  # Limit to 3
+                failure_text = f"**{failure['model']}.{failure['test']}** ({failure['level']} - {failure['severity']})\n"
+                failure_text += f"• {failure['message']}\n"
+                failure_text += f"• Failed: {failure['failed_rows']}/{failure['total_rows']} rows\n"
+                
+                if failure.get('explanation'):
+                    failure_text += f"• {failure['explanation'][:100]}...\n"
+                
+                if failure.get('examples'):
+                    failure_text += "• Examples:\n"
+                    for example in failure['examples']:
+                        example_str = str(example).replace("'", "").replace("{", "").replace("}", "")
+                        failure_text += f"  - {example_str[:60]}...\n"
+                    
+                fields.append({
+                    "title": "Test Failure Details",
+                    "value": failure_text,
+                    "short": False
+                })
+        """
+        
+        # Add Level 2 anomalies
+        if level2_anomalies:
+            fields.append({
+                "title": "🤖 Level 2 Anomalies", 
+                "value": f"**{failure_details.get('total_anomalies', 0)} anomalies** detected across {len(level2_anomalies)} analyzer(s)",
+
+                #"value": f"Total anomalies detected: {failure_details.get('total_anomalies', 0)}", 
+                "short": False
+            })
+            
+            # Add details for each Level 2 analyzer
+            """
+            for anomaly in level2_anomalies[:3]:  # Limit to 3 to avoid message too long
+                level_display = "Level 2"
+                analyzer_text = f"**{anomaly['model']}.{anomaly['analyzer']}** ({level_display} - {anomaly['severity']})\n"
+                analyzer_text += f"• {anomaly['message']}\n"
+                
+                if anomaly.get('explanation'):
+                    analyzer_text += f"• Explanation: {anomaly['explanation'][:100]}...\n"
+                
+                if anomaly.get('examples'):
+                    analyzer_text += "• Examples:\n"
+                    for example in anomaly['examples']:
+                        example_str = str(example).replace("'", "").replace("{", "").replace("}", "")
+                        analyzer_text += f"  - {example_str[:60]}...\n"
+                
+                fields.append({
+                    "title": "Anomaly Details",
+                    "value": analyzer_text,
+                    "short": False
+                })
+                """
+            for anomaly in level2_anomalies[:2]:  # Limite à 2
+                details = f"**Type**: {anomaly['analyzer']} analysis\n"
+                details += f"**Finding**: {anomaly['message']}\n"
+                if anomaly.get('examples') and len(anomaly['examples']) > 0:
+                    details += f"**Key Example**: {str(anomaly['examples'][0])[:60]}..."
+                
+                fields.append({
+                    "title": f"🎯 {anomaly['model']} Anomaly",
+                    "value": details,
+                    "short": True
+                })
+        
+        return {
+            #"text": f"2QC+ Quality Report - {alert_data['target']}",
+            "text": f"📈 2QC+ Quality Report - {alert_data['target']} Environment",
+            "attachments": [
+                {
+                    "color": color,
+                    "fields": fields,
+                    "footer": "2QC Plus Data Quality Framework",
+                    "ts": int(datetime.now().timestamp())
+                }
+            ]
+        }
+        
+        """
         return {
             "text": f"2QC+ Quality Report - {alert_data['target']}",
             "attachments": [
@@ -433,6 +603,8 @@ class AlertManager:
                         {"title": "Total Tests", "value": str(alert_data['total_tests']), "short": True},
                         {"title": "Success Rate", "value": f"{success_rate:.1f}%", "short": True},
                         {"title": "Critical Failures", "value": str(alert_data['critical_failures']), "short": True},
+                        {"title": "Medium Failures", "value": str(alert_data['medium_failures']), "short": True}, 
+                        {"title": "High Failures", "value": str(alert_data['high_failures']), "short": True},
                         {"title": "Execution Time", "value": f"{alert_data['execution_duration']}s", "short": True},
                         {"title": "Run ID", "value": alert_data['run_id'], "short": False}
                     ],
@@ -441,7 +613,7 @@ class AlertManager:
                 }
             ]
         }
-    
+        """
     def _create_teams_individual_payload(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create Microsoft Teams payload for individual alert"""
 
@@ -549,3 +721,228 @@ class AlertManager:
                 test_results['teams'] = False
         
         return test_results
+
+
+
+    # Level2 anomalies alerts are typically medium severity
+
+    # Ajoutez ces méthodes à votre classe AlertManager
+
+    def _determine_level2_severity(self, analyzer_result: Dict[str, Any], anomalies_count: int) -> str:
+        """Determine severity for Level 2 anomalies based on count and type"""
+        
+        details = analyzer_result.get('details', {})
+        
+        # Check for high severity anomalies in the details
+        high_severity_indicators = []
+        
+        # Static correlation anomalies
+        static_anomalies = details.get('static_correlation', {}).get('anomalies', [])
+        for anomaly in static_anomalies:
+            if anomaly.get('severity') == 'high':
+                high_severity_indicators.append('high_correlation_deviation')
+        
+        # Temporal correlation anomalies
+        temporal_anomalies = details.get('temporal_correlation', {}).get('anomalies', [])
+        for anomaly in temporal_anomalies:
+            if anomaly.get('severity') == 'high' or anomaly.get('anomaly_type') == 'sudden_change':
+                high_severity_indicators.append('sudden_correlation_change')
+            if anomaly.get('anomaly_type') == 'correlation_degradation':
+                high_severity_indicators.append('correlation_degradation')
+        
+        # Determine severity based on indicators and count
+        if len(high_severity_indicators) >= 2 or anomalies_count >= 10:
+            return 'critical'
+        elif len(high_severity_indicators) >= 1 or anomalies_count >= 3:
+            return 'high'
+        elif anomalies_count >= 1:
+            return 'medium'
+        else:
+            return 'low'
+
+    def _get_level2_explanation(self, analyzer_name: str, analyzer_result: Dict[str, Any]) -> str:
+        """Generate human-readable explanation for Level 2 anomalies"""
+        
+        details = analyzer_result.get('details', {})
+        
+        # Detailed explanations based on analyzer type and results
+        if analyzer_name == 'correlation':
+            return self._get_correlation_explanation(details)
+        
+        explanations = {
+            'temporal': "Identifies temporal anomalies in data patterns over time. This includes unusual spikes, drops, or trend changes that deviate from expected behavior.",
+            'distribution': "Analyzes distribution changes in data segments compared to historical distributions. Significant shifts may indicate data collection issues or business changes.",
+            'drift': "Monitors data drift by comparing current data characteristics with baseline patterns. High drift scores indicate potential data quality degradation.",
+            'outliers': "Identifies statistical outliers that fall outside normal data ranges. These may represent data entry errors or legitimate exceptional cases.",
+            'completeness': "Monitors data completeness patterns over time. Sudden changes in null rates or missing data patterns may indicate upstream issues.",
+            'consistency': "Checks for consistency violations in data relationships and business rules. Inconsistencies may indicate process breakdowns or data integration issues."
+        }
+        
+        base_explanation = explanations.get(analyzer_name, f"Level 2 anomaly analysis of type '{analyzer_name}' detected unusual patterns in the data.")
+        
+        # Add specific context if available
+        anomalies_count = analyzer_result.get('anomalies_count', 0)
+        if anomalies_count > 0:
+            base_explanation += f" {anomalies_count} anomalies were detected that require investigation."
+        
+        return base_explanation
+
+    def _get_correlation_explanation(self, details: Dict[str, Any]) -> str:
+        """Get detailed explanation for correlation anomalies"""
+        
+        static_count = len(details.get('static_correlation', {}).get('anomalies', []))
+        temporal_count = len(details.get('temporal_correlation', {}).get('anomalies', []))
+        variables_count = len(details.get('variables_analyzed', []))
+        
+        explanation = f"Correlation analysis of {variables_count} variables detected unusual patterns. "
+        
+        if static_count > 0:
+            explanation += f"Found {static_count} static correlation anomalies (unexpected correlation strengths or deviations from expected patterns). "
+        
+        if temporal_count > 0:
+            explanation += f"Found {temporal_count} temporal correlation anomalies (correlation changes over time, volatility, or degradation). "
+        
+        explanation += "These anomalies may indicate data quality issues, process changes, or underlying business shifts that require investigation."
+        
+        return explanation
+
+    def _extract_level2_examples(self, analyzer_result: Dict[str, Any]) -> List[str]:
+        """Extract examples from Level 2 anomaly results"""
+        
+        examples = []
+        
+        try:
+            details = analyzer_result.get('details', {})
+            
+            # For correlation anomalies - Static correlation
+            if 'static_correlation' in details:
+                static_anomalies = details['static_correlation'].get('anomalies', [])
+                for anomaly in static_anomalies[:3]:  # Limit to 3 examples
+                    var_pair = anomaly.get('variable_pair', 'Unknown variables')
+                    correlation = anomaly.get('correlation', 0)
+                    expected = anomaly.get('expected_correlation', 'N/A')
+                    reason = anomaly.get('reason', 'Unknown reason')
+                    examples.append(f"{var_pair}: {correlation:.3f} (expected: {expected}) - {reason}")
+            
+            # For correlation anomalies - Temporal correlation
+            if 'temporal_correlation' in details:
+                temporal_anomalies = details['temporal_correlation'].get('anomalies', [])
+                for anomaly in temporal_anomalies[:3]:  # Limit to 3 examples
+                    var_pair = anomaly.get('variable_pair', 'Unknown variables')
+                    anomaly_type = anomaly.get('anomaly_type', 'unknown')
+                    reason = anomaly.get('reason', 'Unknown reason')
+                    
+                    if anomaly_type == 'sudden_change':
+                        change = anomaly.get('recent_change', 0)
+                        examples.append(f"{var_pair}: Sudden change of {change:.3f}")
+                    elif anomaly_type == 'high_volatility':
+                        std = anomaly.get('correlation_std', 0)
+                        examples.append(f"{var_pair}: High volatility (std: {std:.3f})")
+                    elif anomaly_type == 'correlation_degradation':
+                        degradation = anomaly.get('degradation', 0)
+                        examples.append(f"{var_pair}: Degradation of {degradation:.3f}")
+                    else:
+                        examples.append(f"{var_pair}: {reason}")
+            
+            # For temporal analysis (general)
+            elif 'individual_analyses' in details:
+                individual = details['individual_analyses']
+                for metric, results in list(individual.items())[:3]:  # Limit to 3 metrics
+                    anomalies = results.get('anomalies', [])
+                    if anomalies:
+                        anomaly = anomalies[0]  # Take first anomaly for this metric
+                        z_score = anomaly.get('z_score', anomaly.get('magnitude', 0))
+                        anomaly_type = anomaly.get('type', 'anomaly')
+                        examples.append(f"{metric}: {anomaly_type} (z-score: {z_score:.2f})")
+            
+            # For distribution anomalies
+            elif 'cross_segment_analysis' in details:
+                cross_segment = details['cross_segment_analysis']
+                anomalies = cross_segment.get('anomalies', [])
+                for anomaly in anomalies[:3]:  # Limit to 3 examples
+                    segment = anomaly.get('segment', 'Unknown segment')
+                    segment_value = anomaly.get('segment_value', '')
+                    change = anomaly.get('concentration_change', 0)
+                    examples.append(f"{segment} ({segment_value}): concentration change = {change:.3f}")
+            
+            # Generic fallback for any 'anomalies' list in details
+            if not examples:
+                for key, value in details.items():
+                    if isinstance(value, dict) and 'anomalies' in value:
+                        generic_anomalies = value['anomalies'][:3]
+                        for i, anomaly in enumerate(generic_anomalies):
+                            if isinstance(anomaly, dict):
+                                score = anomaly.get('score', anomaly.get('magnitude', anomaly.get('correlation', i+1)))
+                                var_pair = anomaly.get('variable_pair', anomaly.get('variable', f'Item {i+1}'))
+                                examples.append(f"{var_pair}: score = {score}")
+                            else:
+                                examples.append(f"Anomaly {i+1}: {str(anomaly)[:50]}")
+                        break
+            
+            # Final fallback
+            if not examples:
+                message = analyzer_result.get('message', '')
+                if message:
+                    examples = [message]
+                else:
+                    examples = ["No specific examples available"]
+        
+        except Exception as e:
+            logging.warning(f"Could not extract Level 2 examples: {str(e)}")
+            examples = [f"Unable to extract examples: {str(e)[:100]}"]
+        
+        return examples
+    
+    def _collect_failure_details(self, alert_info: Dict[str, Any], results: Dict[str, Any]) -> Dict[str, Any]:
+        """Collect failure details from both Level 1 and Level 2"""
+        
+        failure_details = {
+            'level1_failures': [],
+            'level2_anomalies': [],
+            'total_anomalies': 0
+        }
+        print(f"DEBUG: critical_failures count: {len(alert_info['critical_failures'])}")
+        print(f"DEBUG: high_failures count: {len(alert_info['high_failures'])}")
+        print(f"DEBUG: medium_failures count: {len(alert_info['medium_failures'])}")
+        # Collect from all severity levels
+        all_failures = (
+                    alert_info['high_failures'] + 
+                    alert_info['medium_failures'])
+
+
+        print(f"DEBUG: total all_failures count: {len(all_failures)}")
+        
+        for failure in all_failures:
+            print(f"DEBUG: Processing failure - type: {failure.get('type')}, model: {failure.get('model')}")
+
+            if failure.get('type') == 'level1':
+                level1_info = {
+                    'model': failure['model'],
+                    'test': failure['test'],
+                    'level': 'Level 1',
+                    'severity': failure['severity'],
+                    'message': failure['message'],
+                    'explanation': failure.get('explanation', ''),
+                    'examples': failure.get('examples', [])[:2],
+                    'failed_rows': failure.get('failed_rows', 0),
+                    'total_rows': failure.get('total_rows', 0)
+                }
+                failure_details['level1_failures'].append(level1_info)
+                
+            elif failure.get('type') == 'level2':
+                level2_info = {
+                    'model': failure['model'],
+                    'analyzer': failure['test'],
+                    'level': 'Level 2',
+                    'severity': failure['severity'],
+                    'message': failure['message'],
+                    'explanation': failure.get('explanation', ''),
+                    'examples': failure.get('examples', [])[:2],
+                    'anomalies_count': failure.get('anomalies_count', 0)
+                }
+                failure_details['level2_anomalies'].append(level2_info)
+                failure_details['total_anomalies'] += failure.get('anomalies_count', 0)
+
+
+        
+        return failure_details
