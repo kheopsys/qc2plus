@@ -166,85 +166,156 @@ SQL_MACROS = {
     """,
     
     # Gardez les autres templates inchangés (statistical_threshold, etc.)...
-    # Remplacez ces templates dans votre macros.py :
-
+    'statistical_threshold': """
+    -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
+    WITH daily_metrics AS (
+        SELECT 
+            DATE(created_at) as metric_date,
+            {% if column_name %}
+                {% if metric == 'count' %}
+                    COUNT({{ column_name }}) as daily_value
+                {% elif metric == 'avg' %}
+                    AVG({{ column_name }}) as daily_value
+                {% elif metric == 'sum' %}
+                    SUM({{ column_name }}) as daily_value
+                {% elif metric == 'min' %}
+                    MIN({{ column_name }}) as daily_value
+                {% elif metric == 'max' %}
+                    MAX({{ column_name }}) as daily_value
+                {% else %}
+                    COUNT({{ column_name }}) as daily_value
+                {% endif %}
+            {% else %}
+                {% if metric == 'count' %}
+                    COUNT(*) as daily_value
+                {% else %}
+                    COUNT(*) as daily_value
+                {% endif %}
+            {% endif %}
+        FROM {{ schema }}.{{ model_name }}
+        WHERE DATE(created_at) BETWEEN 
+            CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
+            AND CURRENT_DATE - INTERVAL '1 day'
+        GROUP BY DATE(created_at)
+    ),
+    current_value AS (
+        SELECT 
+            {% if column_name %}
+                {% if metric == 'count' %}
+                    COUNT({{ column_name }}) as current_metric
+                {% elif metric == 'avg' %}
+                    AVG({{ column_name }}) as current_metric
+                {% elif metric == 'sum' %}
+                    SUM({{ column_name }}) as current_metric
+                {% elif metric == 'min' %}
+                    MIN({{ column_name }}) as current_metric
+                {% elif metric == 'max' %}
+                    MAX({{ column_name }}) as current_metric
+                {% else %}
+                    COUNT({{ column_name }}) as current_metric
+                {% endif %}
+            {% else %}
+                {% if metric == 'count' %}
+                    COUNT(*) as current_metric
+                {% else %}
+                    COUNT(*) as current_metric
+                {% endif %}
+            {% endif %}
+        FROM {{ schema }}.{{ model_name }}
+        WHERE DATE(created_at) = CURRENT_DATE
+    ),
+    historical_stats AS (
+        SELECT 
+            AVG(daily_value) as avg_metric,
+            STDDEV(daily_value) as stddev_metric
+        FROM daily_metrics
+    ),
+    threshold_check AS (
+        SELECT 
+            c.current_metric,
+            h.avg_metric,
+            h.stddev_metric,
+            {% if threshold_type == 'absolute' %}
+                {{ threshold_value }} as threshold_value,
+                CASE 
+                    WHEN c.current_metric > {{ threshold_value }} THEN 1
+                    ELSE 0
+                END as threshold_exceeded
+            {% else %}
+                h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) as threshold_value,
+                CASE 
+                    WHEN c.current_metric > h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
+                    WHEN c.current_metric < h.avg_metric - ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
+                    ELSE 0
+                END as threshold_exceeded
+            {% endif %}
+        FROM current_value c
+        CROSS JOIN historical_stats h
+    )
+    SELECT 
+        '{{ column_name or metric }}' as column_name,
+        threshold_exceeded as failed_rows,
+        1 as total_rows,
+        CONCAT(
+            'Statistical threshold exceeded: current=', 
+            ROUND(current_metric, 2), 
+            ', threshold=', 
+            ROUND(threshold_value, 2),
+            ', historical_avg=',
+            ROUND(COALESCE(avg_metric, 0), 2)
+        ) as message
+    FROM threshold_check
+    WHERE threshold_exceeded = 1
+""",
     'range_check': """
         -- Test: Range check on {{ column_name }}
-        WITH out_of_range AS (
-            SELECT {{ column_name }}
-            FROM {{ schema }}.{{ model_name }}
-            WHERE {{ column_name }} IS NOT NULL
-            AND (
-                {% if min_value is defined %}
-                    {{ column_name }} < {{ min_value }}
-                {% endif %}
-                {% if min_value is defined and max_value is defined %}
-                    OR
-                {% endif %}
-                {% if max_value is defined %}
-                    {{ column_name }} > {{ max_value }}
-                {% endif %}
-            )
-            LIMIT 10
-        )
         SELECT 
             '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
-            WHERE {{ column_name }} IS NOT NULL
-            AND (
-                {% if min_value is defined %}
-                    {{ column_name }} < {{ min_value }}
-                {% endif %}
-                {% if min_value is defined and max_value is defined %}
-                    OR
-                {% endif %}
-                {% if max_value is defined %}
-                    {{ column_name }} > {{ max_value }}
-                {% endif %}
-            )) as failed_rows,
+            COUNT(*) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Values outside allowed range in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de valeurs hors limites
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
-        FROM out_of_range
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
-                WHERE {{ column_name }} IS NOT NULL
-                AND (
-                    {% if min_value is defined %}
-                        {{ column_name }} < {{ min_value }}
-                    {% endif %}
-                    {% if min_value is defined and max_value is defined %}
-                        OR
-                    {% endif %}
-                    {% if max_value is defined %}
-                        {{ column_name }} > {{ max_value }}
-                    {% endif %}
-                )) > 0
+            'Values outside allowed range in {{ column_name }}' as message
+        FROM {{ schema }}.{{ model_name }}
+        WHERE {{ column_name }} IS NOT NULL
+        AND (
+            {% if min_value is defined %}
+                {{ column_name }} < {{ min_value }}
+            {% endif %}
+            {% if min_value is defined and max_value is defined %}
+                OR
+            {% endif %}
+            {% if max_value is defined %}
+                {{ column_name }} > {{ max_value }}
+            {% endif %}
+        )
+        HAVING COUNT(*) > 0
     """,
-
+    
+    'custom_sql': """
+        -- Test: Custom SQL validation
+        {{ custom_sql }}
+    """, 
+    
     'freshness': """
         -- Test: Data freshness check
         WITH freshness_check AS (
-            SELECT 
-                'data_freshness' as column_name,
-                CASE 
-                    WHEN MAX({{ column_name }}) < CURRENT_DATE - INTERVAL '{{ max_age_days }} days' THEN 1
-                    ELSE 0
-                END as failed_rows,
-                1 as total_rows,
-                CONCAT(
-                    'Data is stale. Latest record: ', 
-                    MAX({{ column_name }}),
-                    ', Expected within: ',
-                    '{{ max_age_days }} days'
-                ) as message,
-                -- NOUVEAU : Exemple de la date la plus récente trouvée
-                'Latest date found: ' || MAX({{ column_name }})::text as invalid_examples
-            FROM {{ schema }}.{{ model_name }}
-            WHERE {{ column_name }} IS NOT NULL
+        SELECT 
+            'data_freshness' as column_name,
+            CASE 
+                WHEN MAX({{ column_name }}) < CURRENT_DATE - INTERVAL '{{ max_age_days }} days' THEN 1
+                ELSE 0
+            END as failed_rows,
+            1 as total_rows,
+            CONCAT(
+                'Data is stale. Latest record: ', 
+                MAX({{ column_name }}),
+                ', Expected within: ',
+                '{{ max_age_days }} days'
+            ) as message
+        FROM {{ schema }}.{{ model_name }}
+        WHERE {{ column_name }} IS NOT NULL
         ) 
         SELECT * FROM freshness_check
-        WHERE failed_rows = 1
+        WHERE failed_rows = 1 --- freshness corrected
     """,
 
     'accepted_benchmark_values': """
@@ -263,7 +334,7 @@ SQL_MACROS = {
                 a.{{ column_name }},
                 a.actual_percentage,
                 CASE 
-                    {% for value, expected_pct in benchmark_values.items() %}
+                    {% for value, expected_pct in benchmark_values.items() %}   -----
                     WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
                     {% endfor %}
                     ELSE 0
@@ -281,129 +352,23 @@ SQL_MACROS = {
                 {{ column_name }},
                 actual_percentage,
                 expected_percentage,
-                percentage_diff,
-                CONCAT({{ column_name }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)') as violation_detail
+                percentage_diff
             FROM benchmark_comparison
             WHERE percentage_diff > {{ threshold }} * 100
-            LIMIT 10
         )
         SELECT 
             '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) as failed_rows,
+            COUNT(*) as failed_rows,
             (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Benchmark violations found in distribution' as message,
-            -- NOUVEAU : Exemples de violations de distribution
-            STRING_AGG(violation_detail, ', ') as invalid_examples
-        FROM violations
-        HAVING (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) > 0
-    """,
-
-    'statistical_threshold': """
-        -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
-        WITH daily_metrics AS (
-            SELECT 
-                DATE(created_at) as metric_date,
-                {% if column_name %}
-                    {% if metric == 'count' %}
-                        COUNT({{ column_name }}) as daily_value
-                    {% elif metric == 'avg' %}
-                        AVG({{ column_name }}) as daily_value
-                    {% elif metric == 'sum' %}
-                        SUM({{ column_name }}) as daily_value
-                    {% elif metric == 'min' %}
-                        MIN({{ column_name }}) as daily_value
-                    {% elif metric == 'max' %}
-                        MAX({{ column_name }}) as daily_value
-                    {% else %}
-                        COUNT({{ column_name }}) as daily_value
-                    {% endif %}
-                {% else %}
-                    {% if metric == 'count' %}
-                        COUNT(*) as daily_value
-                    {% else %}
-                        COUNT(*) as daily_value
-                    {% endif %}
-                {% endif %}
-            FROM {{ schema }}.{{ model_name }}
-            WHERE DATE(created_at) BETWEEN 
-                CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
-                AND CURRENT_DATE - INTERVAL '1 day'
-            GROUP BY DATE(created_at)
-        ),
-        current_value AS (
-            SELECT 
-                {% if column_name %}
-                    {% if metric == 'count' %}
-                        COUNT({{ column_name }}) as current_metric
-                    {% elif metric == 'avg' %}
-                        AVG({{ column_name }}) as current_metric
-                    {% elif metric == 'sum' %}
-                        SUM({{ column_name }}) as current_metric
-                    {% elif metric == 'min' %}
-                        MIN({{ column_name }}) as current_metric
-                    {% elif metric == 'max' %}
-                        MAX({{ column_name }}) as current_metric
-                    {% else %}
-                        COUNT({{ column_name }}) as current_metric
-                    {% endif %}
-                {% else %}
-                    {% if metric == 'count' %}
-                        COUNT(*) as current_metric
-                    {% else %}
-                        COUNT(*) as current_metric
-                    {% endif %}
-                {% endif %}
-            FROM {{ schema }}.{{ model_name }}
-            WHERE DATE(created_at) = CURRENT_DATE
-        ),
-        historical_stats AS (
-            SELECT 
-                AVG(daily_value) as avg_metric,
-                STDDEV(daily_value) as stddev_metric
-            FROM daily_metrics
-        ),
-        threshold_check AS (
-            SELECT 
-                c.current_metric,
-                h.avg_metric,
-                h.stddev_metric,
-                {% if threshold_type == 'absolute' %}
-                    {{ threshold_value }} as threshold_value,
-                    CASE 
-                        WHEN c.current_metric > {{ threshold_value }} THEN 1
-                        ELSE 0
-                    END as threshold_exceeded
-                {% else %}
-                    h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) as threshold_value,
-                    CASE 
-                        WHEN c.current_metric > h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
-                        WHEN c.current_metric < h.avg_metric - ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
-                        ELSE 0
-                    END as threshold_exceeded
-                {% endif %}
-            FROM current_value c
-            CROSS JOIN historical_stats h
-        )
-        SELECT 
-            '{{ column_name or metric }}' as column_name,
-            threshold_exceeded as failed_rows,
-            1 as total_rows,
             CONCAT(
-                'Statistical threshold exceeded: current=', 
-                ROUND(current_metric, 2), 
-                ', threshold=', 
-                ROUND(threshold_value, 2),
-                ', historical_avg=',
-                ROUND(COALESCE(avg_metric, 0), 2)
-            ) as message,
-            -- NOUVEAU : Exemples avec valeurs statistiques
-            CONCAT('Current: ', ROUND(current_metric, 2), ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2), ', Threshold: ', ROUND(threshold_value, 2)) as invalid_examples
-        FROM threshold_check
-        WHERE threshold_exceeded = 1
-    """,
-    'custom_sql': """
-        -- Test: Custom SQL validation
-        {{ custom_sql }}
+                'Benchmark violations: ',
+                STRING_AGG(
+                    CONCAT({{ column_name }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)'),
+                    ', '
+                )
+            ) as message
+        FROM violations
+        HAVING COUNT(*) > 0
     """,
 }
 

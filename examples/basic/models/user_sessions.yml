@@ -1,0 +1,22 @@
+models:
+    - name: user_sessions
+      description: "Tests pour la table user_sessions"
+      qc2plus_tests:
+        level1:
+            - unique:
+                column_name: session_id
+                severity: critical
+                
+            - not_null:
+                column_name: user_id
+                severity: critical
+                
+            - future_date:
+                column_name: session_date
+                severity: medium
+                
+            - range_check:
+                column_name: page_views
+                min_value: 0
+                max_value: 1000
+                severity: medium

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   # Base de données PostgreSQL
-  postgres:
+  postgres-data:
     image: postgres:14-bookworm
     platform: linux/arm64
     container_name: qc2plus-postgres
@@ -24,6 +24,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  postgres-results:
+    image: postgres:14-bookworm
+    platform: linux/arm64
+    container_name: qc2plus-postgres-results
+    environment:
+      - POSTGRES_DB=qc2plus_results
+      - POSTGRES_USER=qc2plus
+      - POSTGRES_PASSWORD=qc2plus_password
+    volumes:
+      - postgres_results_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - qc2plus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qc2plus -d qc2plus_results"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   # Runner principal 2QC+
   qc2plus-runner:
@@ -32,12 +53,14 @@ services:
     volumes:
       - ./examples:/app/examples
       - ./logs:/app/logs
+      - ./qc2plus:/app/qc2plus
     environment:
       - QC2PLUS_LOG_LEVEL=INFO
       - PYTHONUNBUFFERED=1
     depends_on:
-      postgres:
+      postgres-data:
         condition: service_healthy
+    restart: unless-stopped  # Redémarre en cas d'échec #AaDDDED
     networks:
       - qc2plus-network
     command: tail -f /dev/null
@@ -52,7 +75,7 @@ services:
     environment:
       - QC2PLUS_LOG_LEVEL=INFO
     depends_on:
-      postgres:
+      postgres-data:
         condition: service_healthy
     networks:
       - qc2plus-network
@@ -76,7 +99,7 @@ services:
       - QC2PLUS_LOG_LEVEL=INFO
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     depends_on:
-      postgres:
+      postgres-data:
         condition: service_healthy
     networks:
       - qc2plus-network
@@ -92,6 +115,7 @@ services:
 
 volumes:
   postgres_data:
+  postgres_results_data:
 
 networks:
   qc2plus-network:

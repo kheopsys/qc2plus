@@ -37,8 +37,9 @@ class TemporalAnalyzer:
             
             # Get temporal data
             data = self._get_temporal_data(model_name, date_column, metrics, window_days, frequency)
-            
+        
             if data.empty or len(data) < 7:
+
                 return {
                     'passed': True,
                     'anomalies_count': 0,
@@ -58,7 +59,7 @@ class TemporalAnalyzer:
                     continue
                     
                 metric_results = self._analyze_metric(
-                    data, metric, seasonality_check, trend_check, anomaly_detection
+                    data, metric, seasonality_check, trend_check, anomaly_detection, frequency
                 )
                 results['analyses'][metric] = metric_results
                 
@@ -155,20 +156,17 @@ class TemporalAnalyzer:
     def _analyze_metric(self, data: pd.DataFrame, metric: str, seasonality_check: bool,
                        trend_check: bool, anomaly_detection: bool, frequency: str) -> Dict[str, Any]:
         """Analyze a single metric for temporal patterns"""
-        
         results = {
             'passed': True,
             'anomalies_count': 0,
             'anomalies': []
-        }
-        
+        }        
         try:
             # Prepare time series
             ts_data = data.set_index('period_date')[metric].fillna(0)
-            
             # Seasonality analysis
             if seasonality_check and len(ts_data) >= 14:
-                seasonality_result = self._check_seasonality(ts_data, metric)
+                seasonality_result = self._check_seasonality(ts_data, metric, frequency)
                 results['seasonality'] = seasonality_result
                 
                 if not seasonality_result['passed']:
@@ -197,7 +195,7 @@ class TemporalAnalyzer:
                     results['anomalies'].extend(anomaly_result.get('anomalies', []))
             
             # Stationarity check
-            stationarity_result = self._check_stationarity(ts_data, metric, frequency)
+            stationarity_result = self._check_stationarity(ts_data, metric)
             results['stationarity'] = stationarity_result
             
         except Exception as e:
@@ -382,7 +380,7 @@ class TemporalAnalyzer:
         try:
             # Statistical approach: Z-score based detection
             z_scores = np.abs(stats.zscore(ts_data.fillna(ts_data.mean())))
-            z_threshold = 3.0
+            z_threshold = 1.5
             
             # IQR approach
             Q1 = ts_data.quantile(0.25)
@@ -394,10 +392,9 @@ class TemporalAnalyzer:
             # Combine both approaches
             z_anomalies = ts_data.index[z_scores > z_threshold]
             iqr_anomalies = ts_data.index[(ts_data < lower_bound) | (ts_data > upper_bound)]
-            
+
             # Union of anomalies
             all_anomalies = set(z_anomalies) | set(iqr_anomalies)
-            
             if len(all_anomalies) > 0:
                 results['passed'] = False
                 results['anomalies_count'] = len(all_anomalies)
@@ -410,8 +407,8 @@ class TemporalAnalyzer:
                         'type': 'point_anomaly',
                         'date': str(date),
                         'metric': metric,
-                        'value': value,
-                        'z_score': z_score,
+                        'value': int(value),
+                        'z_score': float(z_score),
                         'expected_range': f"[{lower_bound:.2f}, {upper_bound:.2f}]",
                         'severity': 'high' if z_score > 4 else 'medium'
                     })

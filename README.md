@@ -234,7 +234,6 @@ alerting:
     enabled: true
     webhook_url: https://company.webhook.office.com/webhookb2/YOUR/TEAMS/WEBHOOK
 ```
-
 ## 📊 Power BI Integration
 
 2QC+ automatically creates three tables for Power BI reporting:

@@ -15,9 +15,19 @@ from qc2plus.core.connection import ConnectionManager
 class PersistenceManager:
     """Manages persistence of quality test results to database"""
     
-    def __init__(self, connection_manager: ConnectionManager):
+    def __init__(self, connection_manager: ConnectionManager, config: Optional[Dict[str, Any]] = None):
         self.connection_manager = connection_manager
-        self.schema = connection_manager.config.get('schema', 'public')
+        self.config = config or {}
+        
+        # Determine if we have separate databases for data and quality
+        if hasattr(connection_manager, 'quality_config') and connection_manager.quality_config:
+            print("Using separate quality database configuration")
+            self.schema = connection_manager.quality_config.get('schema', 'public')
+        else:
+            print("Using same database for data and quality")
+            self.schema = connection_manager.data_config.get('schema', 'public')
+        
+ 
     
     def save_run_summary(self, results: Dict[str, Any]) -> None:
         """Save run summary to quality_run_summary table"""
@@ -50,7 +60,7 @@ class PersistenceManager:
             """
             
             # Execute insert with individual values (not a list)
-            self.connection_manager.execute_sql(sql, run_data)
+            self.connection_manager.execute_sql(sql,params=run_data, use_data_source=False)
             
             logging.info(f"Run summary saved: {run_data['run_id']}")
             
@@ -82,10 +92,18 @@ class PersistenceManager:
                             'failed_rows': test_result.get('failed_rows', 0),
                             'total_rows': test_result.get('total_rows', 0),
                             'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown')
+                            'target_environment': results.get('target', 'unknown'),
+                                                   # NOUVEAUX CHAMPS :
+                            'explanation': test_result.get('explanation', ''),
+                            'examples': json.dumps(test_result.get('examples', [])) if test_result.get('examples') else '',
+                            'query': test_result.get('query', '')
                         }
                         test_records.append(record)
                 
+
+
+
+
                 # Level 2 test results
                 for analyzer_name, analyzer_result in model_results.get('level2', {}).items():
                     if isinstance(analyzer_result, dict):
@@ -101,7 +119,13 @@ class PersistenceManager:
                             'failed_rows': analyzer_result.get('anomalies_count', 0),
                             'total_rows': 1,  # Level 2 tests are typically binary pass/fail
                             'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown')
+                            'target_environment': results.get('target', 'unknown'),
+                        
+                            'explanation': f"Analysis of anomalies type : {analyzer_name}",
+                            'examples': '',
+                            'query': ''
+                            
+                        
                         }
                         test_records.append(record)
             
@@ -202,7 +226,7 @@ class PersistenceManager:
         # Execute individual inserts (fix the list issue)
         for record in test_records:
             #values = [record[col] for col in columns]
-            self.connection_manager.execute_sql(sql, record)
+            self.connection_manager.execute_sql(sql, params=record, use_data_source=False)
     
     def _batch_insert_anomalies(self, anomaly_records: List[Dict[str, Any]]) -> None:
         """Batch insert anomaly records"""
@@ -224,7 +248,7 @@ class PersistenceManager:
         # Execute individual inserts (fix the list issue)
         for record in anomaly_records:
             #values = [record[col] for col in columns]
-            self.connection_manager.execute_sql(sql, record)
+            self.connection_manager.execute_sql(sql, params=record, use_data_source=False)
     
     def _extract_correlation_anomalies(self, details: Dict[str, Any], model_name: str, 
                                      analyzer_name: str) -> List[Dict[str, Any]]:
@@ -393,7 +417,7 @@ class PersistenceManager:
             """
             
             # Adapt for different databases
-            if self.connection_manager.db_type == 'bigquery':
+            if self.connection_manager.db_type  == 'bigquery':
                 run_summary_sql = run_summary_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
                 run_summary_sql = run_summary_sql.replace("INTERVAL '", "INTERVAL ")
                 run_summary_sql = run_summary_sql.replace(" days'", " DAY")
@@ -455,11 +479,11 @@ class PersistenceManager:
             """
             
             # Adapt for different databases
-            if self.connection_manager.db_type == 'bigquery':
+            if self.connection_manager.db_type  == 'bigquery':
                 trends_sql = trends_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
                 trends_sql = trends_sql.replace("INTERVAL '", "INTERVAL ")
                 trends_sql = trends_sql.replace(" days'", " DAY")
-            elif self.connection_manager.db_type == 'snowflake':
+            elif self.connection_manager.db_type  == 'snowflake':
                 trends_sql = trends_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
                 trends_sql = trends_sql.replace(" days'", " DAY'")
             
@@ -499,7 +523,7 @@ class PersistenceManager:
             """
             
             # Adapt for different databases
-            if self.connection_manager.db_type == 'bigquery':
+            if self.connection_manager.db_type  == 'bigquery':
                 run_cleanup_sql = run_cleanup_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
                 run_cleanup_sql = run_cleanup_sql.replace("INTERVAL '", "INTERVAL ")
                 run_cleanup_sql = run_cleanup_sql.replace(" days'", " DAY")

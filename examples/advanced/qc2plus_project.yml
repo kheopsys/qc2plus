@@ -8,7 +8,23 @@ log-path: "logs"
 
 
 alerting:
-  enabled_channels: ["slack"]
+  enabled_channels: ["slack"]  #emails functionnel, "teams"
   slack:
     enabled: true
-    webhook_url: "${SLACK_WEBHOOK_URL}"
+    webhook_url: "https://hooks.slack.com/services/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" #"${SLACK_WEBHOOK_URL}"
+  
+  
+  email:
+    enabled: true
+    smtp_server: "smtp.gmail.com"       # exemple : serveur SMTP
+    smtp_port: 587
+    username: "iettiache@kheopsys.com"
+    password: "vxsh icla aqik zzrh" #"${EMAIL_PASSWORD}"  # App password for Gmail
+    from_email: "iettiache@kheopsys.com"
+    to_emails:
+      - "ikramettiache12@gmail.com"
+
+
+
+
+

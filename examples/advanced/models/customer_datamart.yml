@@ -27,15 +27,23 @@ models:
               'VIP-buyer': 10       
             threshold: 0.2          
             severity: critical
+
         - custom_sql:
-            sql: "SELECT * FROM demo.customer_datamart WHERE customer_segment = 'VIP-buyer'"
+            custom_sql: |
+              SELECT 
+                'vip_buyer_limit' as column_name,
+                COUNT(*) as failed_rows,
+                (SELECT COUNT(*) FROM demo.customer_datamart) as total_rows,
+                'Too many VIP buyers' as message
+                  FROM demo.customer_datamart 
+                  WHERE customer_segment = 'VIP-buyer'
+                  HAVING COUNT(*) > 5
             severity: critical
       level2:
         correlation_analysis:
-          variables: [lifetime_value, order_frequency]
+          variables: [lifetime_value, customer_id]
           expected_correlation: 0.7
           threshold: 0.3
-          #window_days: 20
-          #date_column: updated_at
+
 
 # garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement

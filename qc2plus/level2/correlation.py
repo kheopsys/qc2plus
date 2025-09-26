@@ -31,18 +31,14 @@ class CorrelationAnalyzer:
             threshold = config.get('threshold', 0.2)
             correlation_type = config.get('correlation_type', 'pearson')
             date_column = config.get('date_column', None)
-            window_days = config.get('window_days', 30)
-            
+            window_days = config.get('window_days', None)
+            sample_size = config.get('sample_size', 10000) #  used for calculating correlation with no time windows
             # Validate configuration
             if len(variables) < 2:
                 raise ValueError("At least 2 variables required for correlation analysis")
-
-            # Validate date column
-            if date_column is None:
-                raise ValueError("date_column required for correlation analysis")
             
             # Get data
-            data = self._get_correlation_data(model_name, variables, date_column, window_days)
+            data = self._get_correlation_data(model_name, variables, date_column, window_days, sample_size)
             
             if data.empty:
                 return {
@@ -56,11 +52,13 @@ class CorrelationAnalyzer:
             results = self._perform_correlation_analysis(
                 data, variables, expected_correlation, threshold, correlation_type
             )
-            
-            # Detect temporal correlation changes
-            temporal_results = self._detect_temporal_correlation_changes(
-                model_name, variables, date_column, correlation_type
-            )
+
+            # Detect temporal correlation changes (seulement si date_column existe)
+            temporal_results = {'passed': True, 'anomalies_count': 0, 'anomalies': []}
+            if date_column:
+                temporal_results = self._detect_temporal_correlation_changes(
+                    model_name, variables, date_column, correlation_type
+                )
             
             # Combine results
             anomalies_detected = not results['passed'] or not temporal_results['passed']
@@ -88,30 +86,56 @@ class CorrelationAnalyzer:
             }
     
     def _get_correlation_data(self, model_name: str, variables: List[str], 
-                            date_column: str, window_days: int) -> pd.DataFrame:
+                            date_column: str, window_days: int, sample_size: int) -> pd.DataFrame:
         """Get data for correlation analysis"""
         
         schema = self.connection_manager.config.get('schema', 'public')
         
         # Build query to get aggregated daily data
-        query = f"""
-            SELECT 
-                DATE({date_column}) as analysis_date,
-                {', '.join([f'SUM({var}) as {var}' for var in variables])}
-            FROM {schema}.{model_name}
-            WHERE {date_column} >= CURRENT_DATE - INTERVAL '{window_days} days'
-            GROUP BY DATE({date_column})
-            ORDER BY analysis_date
-        """
-        
-        # Adapt query for different databases
-        if self.connection_manager.db_type == 'bigquery':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace("INTERVAL '", "INTERVAL ")
-            query = query.replace(" days'", " DAY")
-        elif self.connection_manager.db_type == 'snowflake':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace(" days'", " DAY'")
+        # calculer la co
+        if date_column:
+            query = f"""
+                SELECT 
+                    DATE({date_column}) as analysis_date,
+                    {', '.join([f'SUM({var}) as {var}' for var in variables])}
+                FROM {schema}.{model_name}
+                WHERE {date_column} >= CURRENT_DATE - INTERVAL '{window_days} days'
+                GROUP BY DATE({date_column})
+                ORDER BY analysis_date
+            """
+          
+            # Adapt query for different databases
+            if self.connection_manager.db_type == 'bigquery':
+                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
+                query = query.replace("INTERVAL '", "INTERVAL ")
+                query = query.replace(" days'", " DAY")
+            elif self.connection_manager.db_type == 'snowflake':
+                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
+                query = query.replace(" days'", " DAY'")
+        else :
+             # Analyse statique : échantillon de données brutes
+            query = f"""
+                SELECT 
+                    {', '.join(variables)}
+                FROM {schema}.{model_name}
+                WHERE {' AND '.join([f'{var} IS NOT NULL' for var in variables])}
+                LIMIT {sample_size}
+            """
+            
+            # Pour améliorer la représentativité, on peut ajouter un échantillonnage aléatoire
+            if self.connection_manager.db_type == 'postgresql':
+                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
+            elif self.connection_manager.db_type == 'mysql':
+                query = query.replace('LIMIT', 'ORDER BY RAND() LIMIT')
+            elif self.connection_manager.db_type == 'bigquery':
+                query = query.replace('LIMIT', 'ORDER BY RAND() LIMIT')
+            elif self.connection_manager.db_type == 'snowflake':
+                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
+            elif self.connection_manager.db_type == 'redshift':
+                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
+            elif self.connection_manager.db_type == 'sqlite':
+                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
+
         
         return self.connection_manager.execute_query(query)
     
@@ -157,9 +181,9 @@ class CorrelationAnalyzer:
                 
                 pair_name = f"{var1}_vs_{var2}"
                 results['correlations'][pair_name] = {
-                    'correlation': corr_coef,
+                    'correlation': float(corr_coef),
                     'p_value': p_value,
-                    'sample_size': len(clean_data)
+                    'sample_size': int(len(clean_data))
                 }
                 
                 # Check for anomalies
@@ -188,7 +212,7 @@ class CorrelationAnalyzer:
                     results['anomalies_count'] += 1
                     results['anomalies'].append({
                         'variable_pair': pair_name,
-                        'correlation': corr_coef,
+                        'correlation': float(corr_coef),
                         'expected_correlation': expected_correlation,
                         'reason': anomaly_reason,
                         'severity': 'medium'
@@ -284,9 +308,9 @@ class CorrelationAnalyzer:
                         results['temporal_trends'][pair_name] = {
                             'correlations': correlations,
                             'dates': [str(d) for d in dates],
-                            'mean_correlation': correlation_mean,
-                            'std_correlation': correlation_std,
-                            'recent_correlation': recent_corr
+                            'mean_correlation': float(correlation_mean),
+                            'std_correlation': float(correlation_std),
+                            'recent_correlation': float(recent_corr)
                         }
                         
                         # Check for anomalies

@@ -18,9 +18,10 @@ models:
         - freshness:
             column_name: session_date
             max_age_days: 2
-            severity: high
+            severity: critical
       level2:
         temporal_analysis:
+          anomaly_detection: true  
           date_column: session_date
           metrics: [count, sum_page_views]
           seasonality_check: false
