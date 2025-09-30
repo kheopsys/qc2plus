@@ -19,7 +19,7 @@ alerting:
     smtp_server: "smtp.gmail.com"       # exemple : serveur SMTP
     smtp_port: 587
     username: "iettiache@kheopsys.com"
-    password: "vxsh icla aqik zzrh" #"${EMAIL_PASSWORD}"  # App password for Gmail
+    password: "vxsh icla aqik zzrh" #"${EMAIL_PASSWORD}"              # App password for Gmail
     from_email: "iettiache@kheopsys.com"
     to_emails:
       - "ikramettiache12@gmail.com"

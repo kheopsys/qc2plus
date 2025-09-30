@@ -22,6 +22,9 @@ class Level1Engine:
         # Register SQL macros
         for macro_name, macro_template in SQL_MACROS.items():
             self.jinja_env.globals[macro_name] = self._create_macro_function(macro_template)
+        
+        from qc2plus.level1.macros import build_sample_clause
+        self.jinja_env.globals['build_sample_clause'] = build_sample_clause
     
     def _create_macro_function(self, template_str: str):
         """Create a Jinja2 macro function from template string"""
@@ -30,7 +33,7 @@ class Level1Engine:
             return template.render(**kwargs)
         return macro_function
     
-    def run_tests(self, model_name: str, level1_tests: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def run_tests(self, model_name: str, level1_tests: List[Dict[str, Any]], model_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run all Level 1 tests for a model"""
         results = {}
         
@@ -39,7 +42,7 @@ class Level1Engine:
                 test_name = f"{test_type}_{test_params.get('column_name', 'test')}"
                 
                 try:
-                    result = self._run_single_test(model_name, test_type, test_params)
+                    result = self._run_single_test(model_name, test_type, test_params, model_config=model_config)
                     results[test_name] = result
                 except Exception as e:
                     logging.error(f"Test {test_name} failed: {str(e)}")
@@ -51,12 +54,24 @@ class Level1Engine:
         
         return results
     
-    def _run_single_test(self, model_name: str, test_type: str, test_params: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_single_test(self, model_name: str, test_type: str, test_params: Dict[str, Any], model_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run a single Level 1 test"""
+
+        # Resolve sampling configuration
+        sample_config = self._resolve_sample_config(test_params, model_config)
+        
         
         # Generate SQL for the test
-        sql = self.compile_test(test_type, test_params, model_name)
+        sql = self.compile_test(test_type, test_params, model_name, sample_config=sample_config)
 
+        print("="*80)
+        print(f"TEST: {test_type} on {test_params.get('column_name', 'N/A')}")
+        print(f"SAMPLE CONFIG: {sample_config}")
+        print("SQL GENERATED:")
+        print(sql)
+        print("="*80)
+
+        
         # Prepare base result with new fields
         base_result = {
             'query': sql,  # NOUVEAU : SQL query utilisée
@@ -117,7 +132,7 @@ class Level1Engine:
                 'message': f'Test execution failed: {str(e)}'
             }
     
-    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str) -> str:
+    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str, sample_config: Optional[Dict[str, Any]] = None ) -> str:
         """Compile a test to SQL"""
         
         if test_type not in SQL_MACROS:
@@ -133,6 +148,7 @@ class Level1Engine:
             'model_name': model_name,
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
+            'sample_config': sample_config,
             **test_params
         }
         
@@ -409,3 +425,21 @@ class Level1Engine:
                 examples = [str(val) for val in df[first_col].head(max_examples).tolist()]
         
         return examples
+    
+
+    def _resolve_sample_config(self, test_config: Dict[str, Any], 
+                          model_config: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Resolve sampling configuration for a test"""
+        
+        # 1. Test-specific sample config (highest priority)
+        if 'sample' in test_config:
+            if test_config['sample'] is None or test_config['sample'] is False:
+                return None  # Explicitly disable sampling
+            return test_config['sample']
+        
+        # 2. Model-level sample config
+        if model_config and 'sample' in model_config:
+            return model_config['sample']
+        
+        # 3. No sampling
+        return None

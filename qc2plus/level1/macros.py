@@ -5,12 +5,16 @@ Jinja2 templates for business rule validation tests
 
 ## Remplacez vos templates dans macros.py par ces versions corrigées :
 
+from typing import Any, Dict
+
+
 SQL_MACROS = {
     'unique': """
         -- Test: Unique constraint on {{ column_name }}
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) %}
         WITH duplicates AS (
             SELECT {{ column_name }}, COUNT(*) as cnt
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                               --FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
             HAVING COUNT(*) > 1
@@ -34,9 +38,11 @@ SQL_MACROS = {
     
     'not_null': """
         -- Test: Not null constraint on {{ column_name }}
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH null_positions AS (
             SELECT ROW_NUMBER() OVER() as row_pos
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NULL
             LIMIT 10
         )
@@ -53,9 +59,10 @@ SQL_MACROS = {
     
     'email_format': """
         -- Test: Email format validation on {{ column_name }}
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH invalid_emails AS (
             SELECT {{ column_name }}
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                       -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             AND NOT ({{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')
             LIMIT 10
@@ -77,9 +84,11 @@ SQL_MACROS = {
     
     'relationship': """
         -- Test: Foreign key constraint {{ column_name }} -> {{ reference_table }}.{{ reference_column }}
+
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH orphan_keys AS (
             SELECT main.{{ column_name }}
-            FROM {{ schema }}.{{ model_name }} main
+            FROM {{ table_ref }} main
             LEFT JOIN {{ schema }}.{{ reference_table }} ref 
                 ON main.{{ column_name }} = ref.{{ reference_column }}
             WHERE main.{{ column_name }} IS NOT NULL
@@ -107,9 +116,11 @@ SQL_MACROS = {
     
     'future_date': """
         -- Test: Future date validation on {{ column_name }}
+
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH future_dates AS (
             SELECT {{ column_name }}
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                 -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             AND {{ column_name }} > CURRENT_DATE
             LIMIT 10
@@ -131,9 +142,11 @@ SQL_MACROS = {
     
     'accepted_values': """
         -- Test: Accepted values constraint on {{ column_name }}
+        
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH invalid_values AS (
             SELECT {{ column_name }}
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                  -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             AND {{ column_name }} NOT IN (
                 {% for value in accepted_values %}
@@ -165,14 +178,15 @@ SQL_MACROS = {
                 )) > 0
     """,
     
-    # Gardez les autres templates inchangés (statistical_threshold, etc.)...
-    # Remplacez ces templates dans votre macros.py :
+
 
     'range_check': """
         -- Test: Range check on {{ column_name }}
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH out_of_range AS (
             SELECT {{ column_name }}
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             AND (
                 {% if min_value is defined %}
@@ -224,6 +238,7 @@ SQL_MACROS = {
 
     'freshness': """
         -- Test: Data freshness check
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH freshness_check AS (
             SELECT 
                 'data_freshness' as column_name,
@@ -240,7 +255,7 @@ SQL_MACROS = {
                 ) as message,
                 -- NOUVEAU : Exemple de la date la plus récente trouvée
                 'Latest date found: ' || MAX({{ column_name }})::text as invalid_examples
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
         ) 
         SELECT * FROM freshness_check
@@ -249,12 +264,13 @@ SQL_MACROS = {
 
     'accepted_benchmark_values': """
         -- Test: Benchmark values distribution validation on {{ column_name }}
+       {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH actual_distribution AS (
             SELECT 
                 {{ column_name }},
                 COUNT(*) as actual_count,
                 COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as actual_percentage
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}               -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
         ),
@@ -300,6 +316,7 @@ SQL_MACROS = {
 
     'statistical_threshold': """
         -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH daily_metrics AS (
             SELECT 
                 DATE(created_at) as metric_date,
@@ -324,7 +341,7 @@ SQL_MACROS = {
                         COUNT(*) as daily_value
                     {% endif %}
                 {% endif %}
-            FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
             WHERE DATE(created_at) BETWEEN 
                 CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
                 AND CURRENT_DATE - INTERVAL '1 day'
@@ -533,3 +550,165 @@ def get_macro_help(macro_name: str) -> str:
     }
     
     return help_text.get(macro_name, "No help available for this macro.")
+
+# Sampling first step 1 : Utility function to build sampling clause
+def build_sample_clause(sample_config: Dict[str, Any], schema: str, model_name: str) -> str:
+        """Build SQL sampling clause based on configuration"""
+        
+        if not sample_config:
+            return f"{schema}.{model_name}"
+        
+        base_table = f"{schema}.{model_name}"
+        
+        if 'partitioned_by' in sample_config:
+            partition_column = sample_config['partitioned_by']
+            strategy = sample_config.get('partition_strategy', 'latest')
+            
+            if strategy == 'latest':
+                count = sample_config.get('partition_count', 1)
+                base_table = f"""(
+                    SELECT * FROM {base_table}
+                    WHERE {partition_column} >= (
+                        SELECT DISTINCT {partition_column}
+                        FROM {base_table}
+                        ORDER BY {partition_column} DESC
+                        LIMIT 1 OFFSET {count - 1}
+                    ) AS partitioned_data
+                )"""
+            
+            elif strategy == 'range':
+                start_date = sample_config.get('partition_start')
+                end_date = sample_config.get('partition_end')
+                if start_date and end_date:
+                    base_table = f"""(
+                        SELECT * FROM {base_table}
+                        WHERE {partition_column} BETWEEN '{start_date}' AND '{end_date}'
+                    ) AS partitioned_data """
+            
+            elif strategy == 'list':
+                partition_list = sample_config.get('partition_list', [])
+                if partition_list:
+                    partitions_str = "', '".join(str(p) for p in partition_list)
+                    base_table = f"""(
+                        SELECT * FROM {base_table}
+                        WHERE {partition_column} IN ('{partitions_str}')
+                    ) AS partitioned_data """
+                    
+        method = sample_config.get('method')
+
+        if method == 'random':
+            if 'percentage' in sample_config:
+                pct = sample_config['percentage']
+                # Si base_table a déjà un alias (partition), on garde
+                # Sinon on ajoute un alias pour la table de base
+                if 'AS partitioned_data' in base_table:
+                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table})) AS sampled_data"
+                else:
+                    return f"(SELECT * FROM {base_table} AS base_tbl ORDER BY RANDOM() LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table})) AS sampled_data"
+            
+            elif 'size' in sample_config:
+                size = sample_config['size']
+                if 'AS partitioned_data' in base_table:
+                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT {size}) AS sampled_data"
+                else:
+                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT {size}) AS sampled_data"
+        
+        elif method == 'systematic':
+            interval = sample_config.get('interval', 10)
+            return f"(SELECT * FROM (SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) as rn FROM {base_table}) t WHERE rn % {interval} = 0) AS sampled_data"
+        
+        return base_table
+
+
+from typing import Any, Dict, Optional
+
+
+def build_sample_clause(sample_config: Optional[Dict[str, Any]], 
+                       schema: str, 
+                       model_name: str) -> str:
+    """Build SQL sampling clause with integrated partition support"""
+    
+    if not sample_config:
+        return f"{schema}.{model_name}"
+    
+    base_table = f"{schema}.{model_name}"
+    
+    # ÉTAPE 1 : Construire le filtre de partition si présent
+    partition_filter = None
+    if 'partitioned_by' in sample_config:
+        partition_column = sample_config['partitioned_by']
+        strategy = sample_config.get('partition_strategy', 'latest')
+        
+        if strategy == 'latest':
+            count = sample_config.get('partition_count', 1)
+            offset = count - 1
+            partition_filter = f"""
+                {partition_column} >= (
+                    SELECT DISTINCT {partition_column}
+                    FROM {base_table}
+                    ORDER BY {partition_column} DESC
+                    LIMIT 1 OFFSET {offset}
+                )
+            """
+        
+        elif strategy == 'range':
+            start_date = sample_config.get('partition_start')
+            end_date = sample_config.get('partition_end')
+            if start_date and end_date:
+                partition_filter = f"{partition_column} BETWEEN '{start_date}' AND '{end_date}'"
+        
+        elif strategy == 'list':
+            partition_list = sample_config.get('partition_list', [])
+            if partition_list:
+                partitions_str = "', '".join(str(p) for p in partition_list)
+                partition_filter = f"{partition_column} IN ('{partitions_str}')"
+    
+    # ÉTAPE 2 : Appliquer partition + sampling
+    method = sample_config.get('method')
+    
+    # Cas 1 : Partition + Random sampling
+    if partition_filter and method == 'random':
+        if 'percentage' in sample_config:
+            pct = sample_config['percentage']
+            return f"""(
+                SELECT * FROM {base_table}
+                WHERE {partition_filter}
+                ORDER BY RANDOM()
+                LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table} WHERE {partition_filter})
+            ) AS sampled_data"""
+        elif 'size' in sample_config:
+            size = sample_config['size']
+            return f"""(
+                SELECT * FROM {base_table}
+                WHERE {partition_filter}
+                ORDER BY RANDOM()
+                LIMIT {size}
+            ) AS sampled_data"""
+    
+    # Cas 2 : Random sampling sans partition
+    elif method == 'random':
+        if 'percentage' in sample_config:
+            pct = sample_config['percentage']
+            return f"""(
+                SELECT * FROM {base_table}
+                ORDER BY RANDOM()
+                LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table})
+            ) AS sampled_data"""
+        elif 'size' in sample_config:
+            size = sample_config['size']
+            return f"""(
+                SELECT * FROM {base_table}
+                ORDER BY RANDOM()
+                LIMIT {size}
+            ) AS sampled_data"""
+    
+    
+    # Cas 3 : Partition uniquement (pas de sampling)
+    elif partition_filter:
+        return f"""(
+            SELECT * FROM {base_table}
+            WHERE {partition_filter}
+        ) AS partitioned_data"""
+    
+    # Cas 5 : Aucun sampling ni partition
+    return base_table

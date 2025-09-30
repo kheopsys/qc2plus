@@ -32,6 +32,11 @@ SQL_MACROS = {
         HAVING (SELECT COUNT(*) FROM duplicates) > 0
     """,
     
+
+
+    
+
+    
     'not_null': """
         -- Test: Not null constraint on {{ column_name }}
         WITH null_positions AS (

@@ -1,11 +1,18 @@
 models:
   - name: customers
     description: "Advanced Level 1 + Level 2 ML tests"
+    sample:
+      method: random
+      percentage: 0.2
+      partitioned_by: created_at
+      partition_strategy: latest
+      
     qc2plus_tests:
       level1:
         - unique:
             column_name: customer_id
             severity: critical
+            sample: null  # Utilise la config modèle
         - email_format:
             column_name: email
             severity: medium
@@ -14,6 +21,8 @@ models:
             min_value: 18
             max_value: 120
             severity: medium
+
+
       level2:
         - distribution_analysis:
           segments: [country, status]

@@ -199,7 +199,11 @@ class QC2PlusRunner:
         # Run Level 1 tests
         if level in ['1', 'all'] and 'level1' in qc2plus_tests:
             try:
-                level1_results = self.level1_engine.run_tests(model_name, qc2plus_tests['level1'])
+                level1_results = self.level1_engine.run_tests(
+                    model_name,
+                    qc2plus_tests['level1'],
+                    model_config=model_config
+                    )
                 model_results['level1'] = level1_results
                 
                 # Check for critical failures

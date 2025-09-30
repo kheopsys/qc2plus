@@ -26,6 +26,15 @@ models:
             column_name: created_at
             max_age_days: 2
             severity: critical
+
+        - statistical_threshold:
+            metric: count
+            threshold_type: relative
+            threshold_value: 2.0  # 2 écarts-types
+            window_days: 30
+            severity: medium
+
+
       level2:
 
         correlation_analysis:
