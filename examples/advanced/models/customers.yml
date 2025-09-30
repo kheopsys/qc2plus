@@ -12,7 +12,7 @@ models:
         - unique:
             column_name: customer_id
             severity: critical
-            sample: null  # Utilise la config modèle
+            sample: null  #not using model-level sample config
         - email_format:
             column_name: email
             severity: medium
@@ -31,5 +31,4 @@ models:
           reference_period: 30
           comparison_period: 7
         
-# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement
         

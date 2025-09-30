@@ -20,7 +20,7 @@ from qc2plus.level2.distribution import DistributionAnalyzer
 from qc2plus.level2.anomaly_filter import AnomalyFilter
 from qc2plus.alerting.alerts import AlertManager
 from qc2plus.persistence.persistence import PersistenceManager
-
+from datetime import datetime
 
 class QC2PlusRunner:
     """Main test runner orchestrating all quality checks"""

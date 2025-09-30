@@ -30,7 +30,7 @@ models:
         - statistical_threshold:
             metric: count
             threshold_type: relative
-            threshold_value: 2.0  # 2 écarts-types
+            threshold_value: 2.0  
             window_days: 30
             severity: medium
 
@@ -51,7 +51,6 @@ models:
           seasonality_check: true
           window_days: 10   
           frequency: monthly 
-          partitionned_by:    #" 10 000 000"
 
         distribution_analysis:
           segments: [status]
@@ -65,4 +64,3 @@ models:
           #partitionned_by: status  # ex: country, status...
           #severity: high
 
-# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement

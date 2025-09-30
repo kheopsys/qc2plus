@@ -30,7 +30,7 @@ SQL_MACROS = {
             (SELECT COUNT(*) FROM duplicates) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Duplicate values found in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de valeurs dupliquées
+            -- NEW : Examples of duplicate values   
             STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
         FROM limited_duplicates
         HAVING (SELECT COUNT(*) FROM duplicates) > 0
@@ -51,7 +51,7 @@ SQL_MACROS = {
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Null values found in {{ column_name }}' as message,
-            -- NOUVEAU : Pour not_null, on donne les positions des lignes concernées
+            -- NEW : Examples of row positions with nulls
             'Row positions: ' || STRING_AGG(row_pos::text, ', ') as invalid_examples
         FROM null_positions
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) > 0
@@ -74,7 +74,7 @@ SQL_MACROS = {
              AND NOT ({{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Invalid email format found in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples d'emails invalides (Lyon, Paris, etc.)
+            -- NEW : Examples of invalid email addresses
             STRING_AGG({{ column_name }}, ', ') as invalid_examples
         FROM invalid_emails
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} 
@@ -104,7 +104,7 @@ SQL_MACROS = {
              AND ref.{{ reference_column }} IS NULL) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Foreign key violations found in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de clés orphelines
+            -- NEW : Examples of orphan keys
             STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
         FROM orphan_keys
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} main
@@ -132,7 +132,7 @@ SQL_MACROS = {
              AND {{ column_name }} > CURRENT_DATE) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Future dates found in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de dates futures
+            -- NEW : Examples of future dates
             STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
         FROM future_dates
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
@@ -166,7 +166,7 @@ SQL_MACROS = {
              )) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Invalid values found in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de valeurs invalides
+            -- NEW : Examples of invalid values
             STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
         FROM invalid_values
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
@@ -218,7 +218,7 @@ SQL_MACROS = {
             )) as failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Values outside allowed range in {{ column_name }}' as message,
-            -- NOUVEAU : Exemples de valeurs hors limites
+            -- NEW : Examples of out-of-range values
             STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
         FROM out_of_range
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
@@ -253,7 +253,7 @@ SQL_MACROS = {
                     ', Expected within: ',
                     '{{ max_age_days }} days'
                 ) as message,
-                -- NOUVEAU : Exemple de la date la plus récente trouvée
+                -- NEW : Latest date found
                 'Latest date found: ' || MAX({{ column_name }})::text as invalid_examples
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
@@ -308,7 +308,7 @@ SQL_MACROS = {
             (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) as failed_rows,
             (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) as total_rows,
             'Benchmark violations found in distribution' as message,
-            -- NOUVEAU : Exemples de violations de distribution
+            -- NEW : Examples of violations
             STRING_AGG(violation_detail, ', ') as invalid_examples
         FROM violations
         HAVING (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) > 0
@@ -413,7 +413,6 @@ SQL_MACROS = {
                 ', historical_avg=',
                 ROUND(COALESCE(avg_metric, 0), 2)
             ) as message,
-            -- NOUVEAU : Exemples avec valeurs statistiques
             CONCAT('Current: ', ROUND(current_metric, 2), ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2), ', Threshold: ', ROUND(threshold_value, 2)) as invalid_examples
         FROM threshold_check
         WHERE threshold_exceeded = 1
@@ -551,78 +550,9 @@ def get_macro_help(macro_name: str) -> str:
     
     return help_text.get(macro_name, "No help available for this macro.")
 
-# Sampling first step 1 : Utility function to build sampling clause
-def build_sample_clause(sample_config: Dict[str, Any], schema: str, model_name: str) -> str:
-        """Build SQL sampling clause based on configuration"""
-        
-        if not sample_config:
-            return f"{schema}.{model_name}"
-        
-        base_table = f"{schema}.{model_name}"
-        
-        if 'partitioned_by' in sample_config:
-            partition_column = sample_config['partitioned_by']
-            strategy = sample_config.get('partition_strategy', 'latest')
-            
-            if strategy == 'latest':
-                count = sample_config.get('partition_count', 1)
-                base_table = f"""(
-                    SELECT * FROM {base_table}
-                    WHERE {partition_column} >= (
-                        SELECT DISTINCT {partition_column}
-                        FROM {base_table}
-                        ORDER BY {partition_column} DESC
-                        LIMIT 1 OFFSET {count - 1}
-                    ) AS partitioned_data
-                )"""
-            
-            elif strategy == 'range':
-                start_date = sample_config.get('partition_start')
-                end_date = sample_config.get('partition_end')
-                if start_date and end_date:
-                    base_table = f"""(
-                        SELECT * FROM {base_table}
-                        WHERE {partition_column} BETWEEN '{start_date}' AND '{end_date}'
-                    ) AS partitioned_data """
-            
-            elif strategy == 'list':
-                partition_list = sample_config.get('partition_list', [])
-                if partition_list:
-                    partitions_str = "', '".join(str(p) for p in partition_list)
-                    base_table = f"""(
-                        SELECT * FROM {base_table}
-                        WHERE {partition_column} IN ('{partitions_str}')
-                    ) AS partitioned_data """
-                    
-        method = sample_config.get('method')
-
-        if method == 'random':
-            if 'percentage' in sample_config:
-                pct = sample_config['percentage']
-                # Si base_table a déjà un alias (partition), on garde
-                # Sinon on ajoute un alias pour la table de base
-                if 'AS partitioned_data' in base_table:
-                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table})) AS sampled_data"
-                else:
-                    return f"(SELECT * FROM {base_table} AS base_tbl ORDER BY RANDOM() LIMIT (SELECT CAST(COUNT(*) * {pct} AS INTEGER) FROM {base_table})) AS sampled_data"
-            
-            elif 'size' in sample_config:
-                size = sample_config['size']
-                if 'AS partitioned_data' in base_table:
-                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT {size}) AS sampled_data"
-                else:
-                    return f"(SELECT * FROM {base_table} ORDER BY RANDOM() LIMIT {size}) AS sampled_data"
-        
-        elif method == 'systematic':
-            interval = sample_config.get('interval', 10)
-            return f"(SELECT * FROM (SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) as rn FROM {base_table}) t WHERE rn % {interval} = 0) AS sampled_data"
-        
-        return base_table
-
-
 from typing import Any, Dict, Optional
 
-
+# Sampling with partition support 
 def build_sample_clause(sample_config: Optional[Dict[str, Any]], 
                        schema: str, 
                        model_name: str) -> str:
@@ -633,7 +563,6 @@ def build_sample_clause(sample_config: Optional[Dict[str, Any]],
     
     base_table = f"{schema}.{model_name}"
     
-    # ÉTAPE 1 : Construire le filtre de partition si présent
     partition_filter = None
     if 'partitioned_by' in sample_config:
         partition_column = sample_config['partitioned_by']
@@ -663,10 +592,8 @@ def build_sample_clause(sample_config: Optional[Dict[str, Any]],
                 partitions_str = "', '".join(str(p) for p in partition_list)
                 partition_filter = f"{partition_column} IN ('{partitions_str}')"
     
-    # ÉTAPE 2 : Appliquer partition + sampling
     method = sample_config.get('method')
-    
-    # Cas 1 : Partition + Random sampling
+
     if partition_filter and method == 'random':
         if 'percentage' in sample_config:
             pct = sample_config['percentage']
@@ -685,7 +612,6 @@ def build_sample_clause(sample_config: Optional[Dict[str, Any]],
                 LIMIT {size}
             ) AS sampled_data"""
     
-    # Cas 2 : Random sampling sans partition
     elif method == 'random':
         if 'percentage' in sample_config:
             pct = sample_config['percentage']
@@ -703,12 +629,10 @@ def build_sample_clause(sample_config: Optional[Dict[str, Any]],
             ) AS sampled_data"""
     
     
-    # Cas 3 : Partition uniquement (pas de sampling)
     elif partition_filter:
         return f"""(
             SELECT * FROM {base_table}
             WHERE {partition_filter}
         ) AS partitioned_data"""
     
-    # Cas 5 : Aucun sampling ni partition
     return base_table

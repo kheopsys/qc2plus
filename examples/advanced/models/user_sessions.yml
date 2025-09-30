@@ -4,10 +4,10 @@ models:
 
     #sample:
       #method: random
-      #size: 3         # size en nombre de lignes
-    #  partitioned_by: session_date    # Colonne de partitionnement
+      #size: 3         # size for random/sample methods
+    #  partitioned_by: session_date    # Column to partition by (for partitioned tables)
     #  partition_strategy: latest  # Options: latest, range, list
-    #  partition_count: 2  # Nombre de partitions à inclure
+    #  partition_count: 2  # Number of partitions to include (for range/list strategies)
 
 
     qc2plus_tests:
@@ -54,5 +54,4 @@ models:
           window_days: 7
           frequency: daily
       
-# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement
 
