@@ -93,7 +93,6 @@ class PersistenceManager:
                             'total_rows': test_result.get('total_rows', 0),
                             'execution_time': datetime.now(),
                             'target_environment': results.get('target', 'unknown'),
-                                                   # NOUVEAUX CHAMPS :
                             'explanation': test_result.get('explanation', ''),
                             'examples': json.dumps(test_result.get('examples', [])) if test_result.get('examples') else '',
                             'query': test_result.get('query', '')

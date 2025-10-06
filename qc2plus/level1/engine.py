@@ -22,6 +22,9 @@ class Level1Engine:
         # Register SQL macros
         for macro_name, macro_template in SQL_MACROS.items():
             self.jinja_env.globals[macro_name] = self._create_macro_function(macro_template)
+        
+        from qc2plus.level1.macros import build_sample_clause
+        self.jinja_env.globals['build_sample_clause'] = build_sample_clause
     
     def _create_macro_function(self, template_str: str):
         """Create a Jinja2 macro function from template string"""
@@ -30,7 +33,7 @@ class Level1Engine:
             return template.render(**kwargs)
         return macro_function
     
-    def run_tests(self, model_name: str, level1_tests: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def run_tests(self, model_name: str, level1_tests: List[Dict[str, Any]], model_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run all Level 1 tests for a model"""
         results = {}
         
@@ -39,7 +42,7 @@ class Level1Engine:
                 test_name = f"{test_type}_{test_params.get('column_name', 'test')}"
                 
                 try:
-                    result = self._run_single_test(model_name, test_type, test_params)
+                    result = self._run_single_test(model_name, test_type, test_params, model_config=model_config)
                     results[test_name] = result
                 except Exception as e:
                     logging.error(f"Test {test_name} failed: {str(e)}")
@@ -51,17 +54,21 @@ class Level1Engine:
         
         return results
     
-    def _run_single_test(self, model_name: str, test_type: str, test_params: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_single_test(self, model_name: str, test_type: str, test_params: Dict[str, Any], model_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run a single Level 1 test"""
+
+        # Resolve sampling configuration
+        sample_config = self._resolve_sample_config(test_params, model_config)
+        
         
         # Generate SQL for the test
-        sql = self.compile_test(test_type, test_params, model_name)
-
+        sql = self.compile_test(test_type, test_params, model_name, sample_config=sample_config)
+        
         # Prepare base result with new fields
         base_result = {
-            'query': sql,  # NOUVEAU : SQL query utilisée
-            'explanation': self._get_test_explanation(test_type, test_params),  # NOUVEAU : Explication humaine
-            'examples': [],  # NOUVEAU : Sera rempli avec des exemples d'erreurs
+            'query': sql,  # New field for the executed SQL query
+            'explanation': self._get_test_explanation(test_type, test_params),  # New field for human-readable explanation
+            'examples': [],  # New field for error examples
             'severity': test_params.get('severity', 'medium')
         }
     
@@ -95,12 +102,12 @@ class Level1Engine:
                 # Results found means test failed (violations detected)
                 failed_rows = df.iloc[0].get('failed_rows', len(df))
                 total_rows = df.iloc[0].get('total_rows', failed_rows)
-                # NOUVEAU : Extraire des exemples d'erreurs du DataFrame
+                # New: Extract examples of errors
                 examples = self._extract_examples_from_results(df, test_type, test_params)
 
                 return {
                     **base_result,
-                    'examples': df.head(5).to_dict(orient='records'),  # NOUVEAU : Exemples d'erreurs
+                    'examples': df.head(5).to_dict(orient='records'), 
                     'passed': False,
                     'failed_rows': int(failed_rows),
                     'total_rows': int(total_rows),
@@ -117,7 +124,7 @@ class Level1Engine:
                 'message': f'Test execution failed: {str(e)}'
             }
     
-    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str) -> str:
+    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str, sample_config: Optional[Dict[str, Any]] = None ) -> str:
         """Compile a test to SQL"""
         
         if test_type not in SQL_MACROS:
@@ -133,6 +140,7 @@ class Level1Engine:
             'model_name': model_name,
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
+            'sample_config': sample_config,
             **test_params
         }
         
@@ -358,54 +366,65 @@ class Level1Engine:
         """Extract examples of errors from test results"""
         
         examples = []
-        max_examples = 10  # Limiter à 10 exemples
+        max_examples = 10  
         
         try:
-            # Pour les différents types de tests, extraire les exemples appropriés
+            # Extraction example logic based on test type
             if test_type in ['unique', 'not_null', 'email_format', 'future_date']:
-                # Ces tests retournent généralement les valeurs problématiques
+            
                 column_name = test_params.get('column_name', '')
                 
                 if column_name in df.columns:
-                    # Prendre les valeurs uniques pour éviter la répétition
                     unique_values = df[column_name].dropna().unique()[:max_examples]
                     examples = [str(val) for val in unique_values]
                 
                 elif 'invalid_value' in df.columns:
-                    # Si le query retourne une colonne 'invalid_value'
                     unique_values = df['invalid_value'].dropna().unique()[:max_examples]
                     examples = [str(val) for val in unique_values]
                 
                 elif len(df.columns) > 0:
-                    # Prendre la première colonne disponible
                     first_col = df.columns[0]
                     unique_values = df[first_col].dropna().unique()[:max_examples]
                     examples = [str(val) for val in unique_values]
             
             elif test_type == 'relationship':
-                # Pour les tests de relation, montrer les clés orphelines
                 column_name = test_params.get('column_name', '')
                 if column_name in df.columns:
                     unique_values = df[column_name].dropna().unique()[:max_examples]
                     examples = [f"ID orphelin: {val}" for val in unique_values]
             
             elif test_type == 'accepted_benchmark_values':
-                # Pour les tests de benchmark, montrer les distributions actuelles vs attendues
                 if 'value' in df.columns and 'actual_pct' in df.columns and 'expected_pct' in df.columns:
                     for _, row in df.head(max_examples).iterrows():
                         examples.append(f"{row['value']}: {row['actual_pct']:.1f}% (attendu: {row['expected_pct']:.1f}%)")
             
             elif test_type == 'statistical_threshold':
-                # Pour les tests statistiques, montrer les métriques
                 if 'current_value' in df.columns and 'threshold_value' in df.columns:
                     row = df.iloc[0]
                     examples.append(f"Valeur actuelle: {row['current_value']}, Seuil: {row['threshold_value']}")
         
         except Exception as e:
             logging.warning(f"Could not extract examples for test {test_type}: {str(e)}")
-            # Fallback : essayer de prendre les premières valeurs du DataFrame
             if len(df) > 0 and len(df.columns) > 0:
                 first_col = df.columns[0]
                 examples = [str(val) for val in df[first_col].head(max_examples).tolist()]
         
         return examples
+    
+
+    def _resolve_sample_config(self, test_config: Dict[str, Any], 
+                          model_config: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Resolve sampling configuration for a test"""
+        
+        # 1. Test-specific sample config (highest priority)
+        if 'sample' in test_config:
+            if test_config['sample'] is None or test_config['sample'] is False:
+                return None  # Explicitly disable sampling
+            return test_config['sample']
+        
+        # 2. Model-level sample config
+        if model_config and 'sample' in model_config:
+            return model_config['sample']
+        
+        # 3. No sampling
+        return None

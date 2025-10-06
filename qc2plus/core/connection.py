@@ -140,7 +140,7 @@ class ConnectionManager:
     
     def create_quality_tables(self) -> None:
         """Create quality monitoring tables in the quality database"""
-        # CORRECTION : Utiliser quality_config au lieu de data_config
+        
         schema = self.quality_config.get('schema', 'public')
         
         # Table 1: quality_test_results

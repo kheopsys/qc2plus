@@ -51,7 +51,6 @@ class DistributionAnalyzer:
             # Perform ONLY the 2 key analyses
             anomalies = self._detect_segment_anomalies(reference_data, comparison_data, segments, metrics)
 
-            #printing anomalies for debug added
             if anomalies:
                 logging.info(f"Distribution anomalies detected for {model_name}: {anomalies}")
                         

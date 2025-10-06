@@ -11,10 +11,12 @@ models:
             min_value: 0
             max_value: 1000000
             severity: medium
+
         - range_check:
             column_name: order_frequency
             min_value: 1
             severity: medium
+
         - accepted_values:
             column_name: customer_segment
             accepted_values: ['Mono-buyer', 'Regular-buyer', 'VIP-buyer']
@@ -46,4 +48,3 @@ models:
           threshold: 0.3
 
 
-# garder en tete que la quality doit pourvoir s'appliquer sur une table partitionnée pour quelques partitions uniquement
