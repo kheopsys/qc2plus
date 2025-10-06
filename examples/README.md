@@ -10,8 +10,11 @@ qc2plus --help
 ### 1. Démarrer la base de données
 
 ```bash
-# Depuis la racine du projet
-docker-compose up -d postgres
+# Start target database 
+docker-compose up -d postgres-data
+
+# Start qc2plus database to store quality control results
+docker-compose up -d postgres-results
 
 # check containers
 docker-compose ps
@@ -48,9 +51,9 @@ qc2plus run --target demo --level 1
 cd examples/advanced
 
 qc2plus --help
-qc2plus test-connection --target demo 
-qc2plus run --target demo --level all
-qc2plus run --target demo --level 1 --models customers
+qc2plus test-connection --target dev 
+qc2plus run --target dev --level all
+qc2plus run --target dev --level 1 --models customers
 
 ```
 

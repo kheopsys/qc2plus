@@ -11,7 +11,6 @@ advanced_example:
         dbname: qc2plus_demo
         schema: demo
 
-
       quality_output:
         type: postgresql 
         host: postgres-results
