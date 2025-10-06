@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from jinja2 import Environment, BaseLoader
 import pandas as pd
 
-from qc2plus.level1.macros import SQL_MACROS
+from qc2plus.level1.macros import SQL_MACROS, DB_FUNCTIONS
 from qc2plus.core.connection import ConnectionManager
 
 
@@ -124,39 +124,34 @@ class Level1Engine:
                 'message': f'Test execution failed: {str(e)}'
             }
     
-    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str, sample_config: Optional[Dict[str, Any]] = None ) -> str:
+    def compile_test(self, test_type: str, test_params: Dict[str, Any], model_name: str, sample_config: Optional[Dict[str, Any]] = None) -> str:
         """Compile a test to SQL"""
-        
+
         if test_type not in SQL_MACROS:
             raise ValueError(f"Unknown test type: {test_type}")
+
+        # Déterminer le type de base de données
+        db_type = self.connection_manager.db_type if self.connection_manager else 'postgresql'
         
-        # Get database adapter for SQL dialect adaptation
-        db_adapter = None
-        if self.connection_manager:
-            db_adapter = self.connection_manager.get_db_adapter()
-        
-        # Prepare template context
+        # Sélectionner uniquement les fonctions de la DB courante
+        db_functions = DB_FUNCTIONS.get(db_type, DB_FUNCTIONS['postgresql'])
+
+        # Préparer le contexte pour le rendu Jinja
         context = {
             'model_name': model_name,
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
             'sample_config': sample_config,
+            'db': db_functions,
             **test_params
         }
-        
-        # Render SQL template
+
+        # Rendu du SQL
         template = self.jinja_env.from_string(SQL_MACROS[test_type])
         sql = template.render(**context)
-        
-        # Apply database-specific adaptations
-        if db_adapter:
-            if 'email_format' in test_type or 'regex' in sql.lower():
-                sql = db_adapter.adapt_regex(sql)
-            sql = db_adapter.adapt_date_functions(sql)
-            sql = db_adapter.adapt_statistical_functions(sql)
-        
+
         return sql
-    
+
     def get_available_tests(self) -> List[str]:
         """Get list of available test types"""
         return list(SQL_MACROS.keys())

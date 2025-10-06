@@ -5,7 +5,46 @@ Jinja2 templates for business rule validation tests
 
 ## Remplacez vos templates dans macros.py par ces versions corrigées :
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+DB_FUNCTIONS = {
+    'postgresql': {
+        'string_agg': lambda col: f"STRING_AGG({col}::text, ', ')",
+        'cast_text': lambda col: f"{col}::text",
+        'limit': lambda n: f"LIMIT {n}",
+        'current_date': lambda: "CURRENT_DATE",
+        'random_func': lambda: "RANDOM()",
+        'coalesce': lambda a, b: f"COALESCE({a}, {b})",
+        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')"
+    },
+    'bigquery': {
+        'string_agg': lambda col: f"STRING_AGG(CAST({col} AS STRING), ', ')",
+        'cast_text': lambda col: f"CAST({col} AS STRING)",
+        'limit': lambda n: f"LIMIT {n}",
+        'current_date': lambda: "CURRENT_DATE()",
+        'random_func': lambda: "RAND()",
+        'coalesce': lambda a, b: f"IFNULL({a}, {b})",
+        'regex_not_match': lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, r'{pattern}')"
+    },
+    'snowflake': {
+        'string_agg': lambda col: f"LISTAGG({col}, ', ')",
+        'cast_text': lambda col: f"CAST({col} AS STRING)",
+        'limit': lambda n: f"LIMIT {n}",
+        'current_date': lambda: "CURRENT_DATE()",
+        'random_func': lambda: "RANDOM()",
+        'coalesce': lambda a, b: f"COALESCE({a}, {b})",
+        'regex_not_match': lambda col, pattern: f"NOT REGEXP_LIKE({col}, '{pattern}')"
+    },
+    'redshift': {
+        'string_agg': lambda col: f"LISTAGG({col}, ', ')",
+        'cast_text': lambda col: f"CAST({col} AS VARCHAR)",
+        'limit': lambda n: f"LIMIT {n}",
+        'current_date': lambda: "CURRENT_DATE",
+        'random_func': lambda: "RANDOM()",
+        'coalesce': lambda a, b: f"COALESCE({a}, {b})",
+        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')"
+    }
+}
 
 
 SQL_MACROS = {
@@ -13,8 +52,8 @@ SQL_MACROS = {
         -- Test: Unique constraint on {{ column_name }}
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) %}
         WITH duplicates AS (
-            SELECT {{ column_name }}, COUNT(*) as cnt
-            FROM {{ table_ref }}                               --FROM {{ schema }}.{{ model_name }}
+            SELECT {{ column_name }}, COUNT(*) AS cnt
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
             HAVING COUNT(*) > 1
@@ -23,69 +62,70 @@ SQL_MACROS = {
             SELECT {{ column_name }}
             FROM duplicates
             ORDER BY cnt DESC
-            LIMIT 10
+            {{ db_functions.limit(10) }}
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM duplicates) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Duplicate values found in {{ column_name }}' as message,
-            -- NEW : Examples of duplicate values   
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) FROM duplicates) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Duplicate values found in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
         FROM limited_duplicates
         HAVING (SELECT COUNT(*) FROM duplicates) > 0
     """,
-    
+
     'not_null': """
         -- Test: Not null constraint on {{ column_name }}
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
 
         WITH null_positions AS (
-            SELECT ROW_NUMBER() OVER() as row_pos
-            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
+            SELECT ROW_NUMBER() OVER() AS row_pos
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NULL
-            LIMIT 10
+            {{ db_functions.limit(10) }} 
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Null values found in {{ column_name }}' as message,
-            -- NEW : Examples of row positions with nulls
-            'Row positions: ' || STRING_AGG(row_pos::text, ', ') as invalid_examples
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Null values found in {{ column_name }}' AS message,
+            'Row positions: ' || {{ db_functions.string_agg(db_functions.cast_text('row_pos')) }} AS invalid_examples
         FROM null_positions
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) > 0
     """,
-    
+
     'email_format': """
         -- Test: Email format validation on {{ column_name }}
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
+        {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$' %}
+
         WITH invalid_emails AS (
             SELECT {{ column_name }}
-            FROM {{ table_ref }}                       -- before sampling FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
-            AND NOT ({{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')
-            LIMIT 10
+            AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}
+            {{ db_functions.limit(10) }}
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} 
-             WHERE {{ column_name }} IS NOT NULL
-             AND NOT ({{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Invalid email format found in {{ column_name }}' as message,
-            -- NEW : Examples of invalid email addresses
-            STRING_AGG({{ column_name }}, ', ') as invalid_examples
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
+            WHERE {{ column_name }} IS NOT NULL
+            AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Invalid email format found in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
         FROM invalid_emails
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} 
+        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
-                AND NOT ({{ column_name }} ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')) > 0
+                AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}) > 0
     """,
-    
+
     'relationship': """
         -- Test: Foreign key constraint {{ column_name }} -> {{ reference_table }}.{{ reference_column }}
 
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH orphan_keys AS (
             SELECT main.{{ column_name }}
             FROM {{ table_ref }} main
@@ -93,83 +133,87 @@ SQL_MACROS = {
                 ON main.{{ column_name }} = ref.{{ reference_column }}
             WHERE main.{{ column_name }} IS NOT NULL
             AND ref.{{ reference_column }} IS NULL
-            LIMIT 10
+            {{ db_functions.limit(10) }} 
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} main
-             LEFT JOIN {{ schema }}.{{ reference_table }} ref 
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) 
+            FROM {{ schema }}.{{ model_name }} main
+            LEFT JOIN {{ schema }}.{{ reference_table }} ref 
                 ON main.{{ column_name }} = ref.{{ reference_column }}
-             WHERE main.{{ column_name }} IS NOT NULL
-             AND ref.{{ reference_column }} IS NULL) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Foreign key violations found in {{ column_name }}' as message,
-            -- NEW : Examples of orphan keys
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
+            WHERE main.{{ column_name }} IS NOT NULL
+            AND ref.{{ reference_column }} IS NULL) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Foreign key violations found in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text('main.' + column_name)) }} AS invalid_examples
         FROM orphan_keys
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} main
+        HAVING (SELECT COUNT(*) 
+                FROM {{ schema }}.{{ model_name }} main
                 LEFT JOIN {{ schema }}.{{ reference_table }} ref 
-                   ON main.{{ column_name }} = ref.{{ reference_column }}
+                    ON main.{{ column_name }} = ref.{{ reference_column }}
                 WHERE main.{{ column_name }} IS NOT NULL
                 AND ref.{{ reference_column }} IS NULL) > 0
     """,
-    
+
     'future_date': """
         -- Test: Future date validation on {{ column_name }}
 
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH future_dates AS (
             SELECT {{ column_name }}
-            FROM {{ table_ref }}                 -- before sampling FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
-            AND {{ column_name }} > CURRENT_DATE
-            LIMIT 10
+            AND {{ column_name }} > {{ db_functions.current_date() }}   
+            {{ db_functions.limit(10) }}                                 
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
-             WHERE {{ column_name }} IS NOT NULL
-             AND {{ column_name }} > CURRENT_DATE) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Future dates found in {{ column_name }}' as message,
-            -- NEW : Examples of future dates
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) 
+            FROM {{ schema }}.{{ model_name }}
+            WHERE {{ column_name }} IS NOT NULL
+            AND {{ column_name }} > {{ db_functions.current_date() }}) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Future dates found in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
         FROM future_dates
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
+        HAVING (SELECT COUNT(*) 
+                FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
-                AND {{ column_name }} > CURRENT_DATE) > 0
+                AND {{ column_name }} > {{ db_functions.current_date() }}) > 0
     """,
-    
+
     'accepted_values': """
         -- Test: Accepted values constraint on {{ column_name }}
         
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
         WITH invalid_values AS (
             SELECT {{ column_name }}
-            FROM {{ table_ref }}                  -- before sampling FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             AND {{ column_name }} NOT IN (
                 {% for value in accepted_values %}
                     '{{ value }}'{% if not loop.last %},{% endif %}
                 {% endfor %}
             )
-            LIMIT 10
+            {{ db_functions.limit(10) }} 
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
-             WHERE {{ column_name }} IS NOT NULL
-             AND {{ column_name }} NOT IN (
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) 
+            FROM {{ schema }}.{{ model_name }}
+            WHERE {{ column_name }} IS NOT NULL
+            AND {{ column_name }} NOT IN (
                 {% for value in accepted_values %}
                     '{{ value }}'{% if not loop.last %},{% endif %}
                 {% endfor %}
-             )) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Invalid values found in {{ column_name }}' as message,
-            -- NEW : Examples of invalid values
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
+            )) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Invalid values found in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
         FROM invalid_values
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
+        HAVING (SELECT COUNT(*) 
+                FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
                 AND {{ column_name }} NOT IN (
                     {% for value in accepted_values %}
@@ -177,8 +221,6 @@ SQL_MACROS = {
                     {% endfor %}
                 )) > 0
     """,
-    
-
 
     'range_check': """
         -- Test: Range check on {{ column_name }}
@@ -186,7 +228,7 @@ SQL_MACROS = {
 
         WITH out_of_range AS (
             SELECT {{ column_name }}
-            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             AND (
                 {% if min_value is defined %}
@@ -199,11 +241,12 @@ SQL_MACROS = {
                     {{ column_name }} > {{ max_value }}
                 {% endif %}
             )
-            LIMIT 10
+            {{ db_functions.limit(10) }} 
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*)
+            FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
             AND (
                 {% if min_value is defined %}
@@ -215,13 +258,13 @@ SQL_MACROS = {
                 {% if max_value is defined %}
                     {{ column_name }} > {{ max_value }}
                 {% endif %}
-            )) as failed_rows,
-            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Values outside allowed range in {{ column_name }}' as message,
-            -- NEW : Examples of out-of-range values
-            STRING_AGG({{ column_name }}::text, ', ') as invalid_examples
+            )) AS failed_rows,
+            (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Values outside allowed range in {{ column_name }}' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
         FROM out_of_range
-        HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
+        HAVING (SELECT COUNT(*)
+                FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
                 AND (
                     {% if min_value is defined %}
@@ -239,22 +282,22 @@ SQL_MACROS = {
     'freshness': """
         -- Test: Data freshness check
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH freshness_check AS (
             SELECT 
-                'data_freshness' as column_name,
+                'data_freshness' AS column_name,
                 CASE 
-                    WHEN MAX({{ column_name }}) < CURRENT_DATE - INTERVAL '{{ max_age_days }} days' THEN 1
+                    WHEN MAX({{ column_name }}) < {{ db_functions.current_date() }} - INTERVAL '{{ max_age_days }} days' THEN 1
                     ELSE 0
-                END as failed_rows,
-                1 as total_rows,
+                END AS failed_rows,
+                1 AS total_rows,
                 CONCAT(
                     'Data is stale. Latest record: ', 
-                    MAX({{ column_name }}),
+                    {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }},
                     ', Expected within: ',
                     '{{ max_age_days }} days'
-                ) as message,
-                -- NEW : Latest date found
-                'Latest date found: ' || MAX({{ column_name }})::text as invalid_examples
+                ) AS message,
+                'Latest date found: ' || {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }} AS invalid_examples
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
         ) 
@@ -264,13 +307,15 @@ SQL_MACROS = {
 
     'accepted_benchmark_values': """
         -- Test: Benchmark values distribution validation on {{ column_name }}
-       {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
+        {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH actual_distribution AS (
             SELECT 
                 {{ column_name }},
-                COUNT(*) as actual_count,
-                COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as actual_percentage
-            FROM {{ table_ref }}               -- before sampling FROM {{ schema }}.{{ model_name }}
+                COUNT(*) AS actual_count,
+                COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() AS actual_percentage
+            FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
         ),
@@ -283,13 +328,13 @@ SQL_MACROS = {
                     WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
                     {% endfor %}
                     ELSE 0
-                END as expected_percentage,
+                END AS expected_percentage,
                 ABS(a.actual_percentage - CASE 
                     {% for value, expected_pct in benchmark_values.items() %}
                     WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
                     {% endfor %}
                     ELSE 0
-                END) as percentage_diff
+                END) AS percentage_diff
             FROM actual_distribution a
         ),
         violations AS (
@@ -298,18 +343,17 @@ SQL_MACROS = {
                 actual_percentage,
                 expected_percentage,
                 percentage_diff,
-                CONCAT({{ column_name }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)') as violation_detail
+                CONCAT({{ db_functions.cast_text(column_name) }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)') AS violation_detail
             FROM benchmark_comparison
             WHERE percentage_diff > {{ threshold }} * 100
-            LIMIT 10
+            {{ db_functions.limit(10) }}  
         )
         SELECT 
-            '{{ column_name }}' as column_name,
-            (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) as failed_rows,
-            (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) as total_rows,
-            'Benchmark violations found in distribution' as message,
-            -- NEW : Examples of violations
-            STRING_AGG(violation_detail, ', ') as invalid_examples
+            '{{ column_name }}' AS column_name,
+            (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) AS failed_rows,
+            (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) AS total_rows,
+            'Benchmark violations found in distribution' AS message,
+            {{ db_functions.string_agg(db_functions.cast_text('violation_detail')) }} AS invalid_examples
         FROM violations
         HAVING (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) > 0
     """,
@@ -317,66 +361,59 @@ SQL_MACROS = {
     'statistical_threshold': """
         -- Test: Statistical threshold for {{ metric }} on {{ column_name or 'table' }}
         {% set table_ref = build_sample_clause(sample_config, schema, model_name) if sample_config else schema + '.' + model_name %}
+
         WITH daily_metrics AS (
             SELECT 
-                DATE(created_at) as metric_date,
+                DATE(created_at) AS metric_date,
                 {% if column_name %}
                     {% if metric == 'count' %}
-                        COUNT({{ column_name }}) as daily_value
+                        COUNT({{ column_name }}) AS daily_value
                     {% elif metric == 'avg' %}
-                        AVG({{ column_name }}) as daily_value
+                        AVG({{ column_name }}) AS daily_value
                     {% elif metric == 'sum' %}
-                        SUM({{ column_name }}) as daily_value
+                        SUM({{ column_name }}) AS daily_value
                     {% elif metric == 'min' %}
-                        MIN({{ column_name }}) as daily_value
+                        MIN({{ column_name }}) AS daily_value
                     {% elif metric == 'max' %}
-                        MAX({{ column_name }}) as daily_value
+                        MAX({{ column_name }}) AS daily_value
                     {% else %}
-                        COUNT({{ column_name }}) as daily_value
+                        COUNT({{ column_name }}) AS daily_value
                     {% endif %}
                 {% else %}
-                    {% if metric == 'count' %}
-                        COUNT(*) as daily_value
-                    {% else %}
-                        COUNT(*) as daily_value
-                    {% endif %}
+                    COUNT(*) AS daily_value
                 {% endif %}
-            FROM {{ table_ref }}                    -- before sampling FROM {{ schema }}.{{ model_name }}
+            FROM {{ table_ref }}
             WHERE DATE(created_at) BETWEEN 
-                CURRENT_DATE - INTERVAL '{{ window_days or 30 }} days' 
-                AND CURRENT_DATE - INTERVAL '1 day'
+                {{ db_functions.current_date() }} - INTERVAL '{{ window_days or 30 }} days'
+            AND {{ db_functions.current_date() }} - INTERVAL '1 day'
             GROUP BY DATE(created_at)
         ),
         current_value AS (
             SELECT 
                 {% if column_name %}
                     {% if metric == 'count' %}
-                        COUNT({{ column_name }}) as current_metric
+                        COUNT({{ column_name }}) AS current_metric
                     {% elif metric == 'avg' %}
-                        AVG({{ column_name }}) as current_metric
+                        AVG({{ column_name }}) AS current_metric
                     {% elif metric == 'sum' %}
-                        SUM({{ column_name }}) as current_metric
+                        SUM({{ column_name }}) AS current_metric
                     {% elif metric == 'min' %}
-                        MIN({{ column_name }}) as current_metric
+                        MIN({{ column_name }}) AS current_metric
                     {% elif metric == 'max' %}
-                        MAX({{ column_name }}) as current_metric
+                        MAX({{ column_name }}) AS current_metric
                     {% else %}
-                        COUNT({{ column_name }}) as current_metric
+                        COUNT({{ column_name }}) AS current_metric
                     {% endif %}
                 {% else %}
-                    {% if metric == 'count' %}
-                        COUNT(*) as current_metric
-                    {% else %}
-                        COUNT(*) as current_metric
-                    {% endif %}
+                    COUNT(*) AS current_metric
                 {% endif %}
             FROM {{ schema }}.{{ model_name }}
-            WHERE DATE(created_at) = CURRENT_DATE
+            WHERE DATE(created_at) = {{ db_functions.current_date() }}
         ),
         historical_stats AS (
             SELECT 
-                AVG(daily_value) as avg_metric,
-                STDDEV(daily_value) as stddev_metric
+                AVG(daily_value) AS avg_metric,
+                STDDEV(daily_value) AS stddev_metric
             FROM daily_metrics
         ),
         threshold_check AS (
@@ -385,103 +422,48 @@ SQL_MACROS = {
                 h.avg_metric,
                 h.stddev_metric,
                 {% if threshold_type == 'absolute' %}
-                    {{ threshold_value }} as threshold_value,
+                    {{ threshold_value }} AS threshold_value,
                     CASE 
                         WHEN c.current_metric > {{ threshold_value }} THEN 1
                         ELSE 0
-                    END as threshold_exceeded
+                    END AS threshold_exceeded
                 {% else %}
-                    h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) as threshold_value,
+                    h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) AS threshold_value,
                     CASE 
                         WHEN c.current_metric > h.avg_metric + ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
                         WHEN c.current_metric < h.avg_metric - ({{ threshold_value }} * COALESCE(h.stddev_metric, 0)) THEN 1
                         ELSE 0
-                    END as threshold_exceeded
+                    END AS threshold_exceeded
                 {% endif %}
             FROM current_value c
             CROSS JOIN historical_stats h
         )
         SELECT 
-            '{{ column_name or metric }}' as column_name,
-            threshold_exceeded as failed_rows,
-            1 as total_rows,
+            '{{ column_name or metric }}' AS column_name,
+            threshold_exceeded AS failed_rows,
+            1 AS total_rows,
             CONCAT(
                 'Statistical threshold exceeded: current=', 
-                ROUND(current_metric, 2), 
+                ROUND(c.current_metric, 2), 
                 ', threshold=', 
                 ROUND(threshold_value, 2),
                 ', historical_avg=',
                 ROUND(COALESCE(avg_metric, 0), 2)
-            ) as message,
-            CONCAT('Current: ', ROUND(current_metric, 2), ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2), ', Threshold: ', ROUND(threshold_value, 2)) as invalid_examples
-        FROM threshold_check
+            ) AS message,
+            CONCAT(
+                'Current: ', ROUND(c.current_metric, 2), 
+                ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2), 
+                ', Threshold: ', ROUND(threshold_value, 2)
+            ) AS invalid_examples
+        FROM threshold_check c
         WHERE threshold_exceeded = 1
     """,
+
     'custom_sql': """
         -- Test: Custom SQL validation
         {{ custom_sql }}
     """,
 }
-
-
-# Database-specific adaptations for SQL macros
-DB_ADAPTATIONS = {
-    'postgresql': {
-        'regex_operator': '~',
-        'date_diff': 'DATE_PART',
-        'current_date': 'CURRENT_DATE',
-        'interval_syntax': "INTERVAL '{} days'"
-    },
-    'snowflake': {
-        'regex_operator': 'REGEXP',
-        'date_diff': 'DATEDIFF',
-        'current_date': 'CURRENT_DATE()',
-        'interval_syntax': "INTERVAL '{} DAY'"
-    },
-    'bigquery': {
-        'regex_operator': 'REGEXP_CONTAINS',
-        'date_diff': 'DATE_DIFF',
-        'current_date': 'CURRENT_DATE()',
-        'interval_syntax': "INTERVAL {} DAY"
-    },
-    'redshift': {
-        'regex_operator': '~',
-        'date_diff': 'DATEDIFF',
-        'current_date': 'CURRENT_DATE',
-        'interval_syntax': "INTERVAL '{} days'"
-    }
-}
-
-
-def adapt_sql_for_database(sql: str, db_type: str) -> str:
-    """Adapt SQL template for specific database type"""
-    
-    if db_type not in DB_ADAPTATIONS:
-        return sql
-    
-    adaptations = DB_ADAPTATIONS[db_type]
-    
-    # Apply adaptations
-    if db_type == 'bigquery':
-        # BigQuery specific adaptations
-        sql = sql.replace('~', 'REGEXP_CONTAINS')
-        sql = sql.replace('DATE_PART', 'DATE_DIFF')
-        sql = sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
-        sql = sql.replace("INTERVAL '", "INTERVAL ")
-        sql = sql.replace(" days'", " DAY")
-        
-    elif db_type == 'snowflake':
-        # Snowflake specific adaptations
-        sql = sql.replace('~', 'REGEXP')
-        sql = sql.replace('DATE_PART', 'DATEDIFF')
-        sql = sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
-        sql = sql.replace(" days'", " DAY'")
-        
-    elif db_type == 'redshift':
-        # Redshift specific adaptations
-        sql = sql.replace('DATE_PART', 'DATEDIFF')
-        
-    return sql
 
 
 def get_macro_help(macro_name: str) -> str:
@@ -550,7 +532,6 @@ def get_macro_help(macro_name: str) -> str:
     
     return help_text.get(macro_name, "No help available for this macro.")
 
-from typing import Any, Dict, Optional
 
 # Sampling with partition support 
 def build_sample_clause(sample_config: Optional[Dict[str, Any]], 

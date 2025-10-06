@@ -9,6 +9,12 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 import pandas as pd
 import json
+from qc2plus.core.db_adapters import (
+    PostgreSQLAdapter,
+    SnowflakeAdapter,
+    BigQueryAdapter,
+    RedshiftAdapter,
+)
 
 
 class ConnectionManager:
@@ -319,79 +325,3 @@ class ConnectionManager:
             logging.error(f"Failed to get table info for {schema}.{table_name}: {str(e)}")
             return {'columns': [], 'column_count': 0, 'table_name': table_name, 'schema': schema}
     
-    def get_db_adapter(self) -> 'DatabaseAdapter':
-        """Get database-specific adapter for SQL generation"""
-        if self.db_type == 'postgresql':
-            return PostgreSQLAdapter()
-        elif self.db_type == 'snowflake':
-            return SnowflakeAdapter()
-        elif self.db_type == 'bigquery':
-            return BigQueryAdapter()
-        elif self.db_type == 'redshift':
-            return RedshiftAdapter()
-        else:
-            raise ValueError(f"No adapter available for {self.db_type}")
-
-
-class DatabaseAdapter:
-    """Base class for database-specific SQL adaptations"""
-    
-    def adapt_regex(self, pattern: str) -> str:
-        """Adapt regex pattern for database"""
-        return pattern
-    
-    def adapt_date_functions(self, sql: str) -> str:
-        """Adapt date functions for database"""
-        return sql
-    
-    def adapt_statistical_functions(self, sql: str) -> str:
-        """Adapt statistical functions for database"""
-        return sql
-
-
-class PostgreSQLAdapter(DatabaseAdapter):
-    """PostgreSQL-specific SQL adaptations"""
-    
-    def adapt_regex(self, pattern: str) -> str:
-        return pattern
-        #return f"~ '{pattern}'"
-    
-    def adapt_date_functions(self, sql: str) -> str:
-        sql = sql.replace('DATE_DIFF', 'DATE_PART')
-        sql = sql.replace('CURRENT_DATE()', 'CURRENT_DATE')
-        return sql
-
-
-class SnowflakeAdapter(DatabaseAdapter):
-    """Snowflake-specific SQL adaptations"""
-    
-    def adapt_regex(self, pattern: str) -> str:
-        return f"REGEXP '{pattern}'"
-    
-    def adapt_date_functions(self, sql: str) -> str:
-        sql = sql.replace('DATE_DIFF', 'DATEDIFF')
-        return sql
-
-
-class BigQueryAdapter(DatabaseAdapter):
-    """BigQuery-specific SQL adaptations"""
-    
-    def adapt_regex(self, pattern: str) -> str:
-        return f"REGEXP_CONTAINS(column, r'{pattern}')"
-    
-    def adapt_date_functions(self, sql: str) -> str:
-        sql = sql.replace('DATE_DIFF', 'DATE_DIFF')
-        sql = sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
-        return sql
-
-
-class RedshiftAdapter(DatabaseAdapter):
-    """Redshift-specific SQL adaptations"""
-    
-    def adapt_regex(self, pattern: str) -> str:
-        return f"~ '{pattern}'"
-    
-    def adapt_date_functions(self, sql: str) -> str:
-        sql = sql.replace('DATE_DIFF', 'DATEDIFF')
-        sql = sql.replace('CURRENT_DATE()', 'CURRENT_DATE')
-        return sql
