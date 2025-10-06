@@ -142,7 +142,7 @@ class Level1Engine:
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
             'sample_config': sample_config,
-            'db': db_functions,
+            'db_functions': db_functions,
             **test_params
         }
 

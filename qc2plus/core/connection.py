@@ -9,12 +9,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 import pandas as pd
 import json
-from qc2plus.core.db_adapters import (
-    PostgreSQLAdapter,
-    SnowflakeAdapter,
-    BigQueryAdapter,
-    RedshiftAdapter,
-)
 
 
 class ConnectionManager:

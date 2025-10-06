@@ -15,7 +15,8 @@ DB_FUNCTIONS = {
         'current_date': lambda: "CURRENT_DATE",
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
-        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')"
+        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'"
     },
     'bigquery': {
         'string_agg': lambda col: f"STRING_AGG(CAST({col} AS STRING), ', ')",
@@ -24,7 +25,8 @@ DB_FUNCTIONS = {
         'current_date': lambda: "CURRENT_DATE()",
         'random_func': lambda: "RAND()",
         'coalesce': lambda a, b: f"IFNULL({a}, {b})",
-        'regex_not_match': lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, r'{pattern}')"
+        'regex_not_match': lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, r'{pattern}')",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)"
     },
     'snowflake': {
         'string_agg': lambda col: f"LISTAGG({col}, ', ')",
@@ -33,7 +35,8 @@ DB_FUNCTIONS = {
         'current_date': lambda: "CURRENT_DATE()",
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
-        'regex_not_match': lambda col, pattern: f"NOT REGEXP_LIKE({col}, '{pattern}')"
+        'regex_not_match': lambda col, pattern: f"NOT REGEXP_LIKE({col}, '{pattern}')",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})"
     },
     'redshift': {
         'string_agg': lambda col: f"LISTAGG({col}, ', ')",
@@ -42,7 +45,8 @@ DB_FUNCTIONS = {
         'current_date': lambda: "CURRENT_DATE",
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
-        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')"
+        'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'"
     }
 }
 
@@ -69,7 +73,7 @@ SQL_MACROS = {
             (SELECT COUNT(*) FROM duplicates) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Duplicate values found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg(column_name) }} AS invalid_examples
         FROM limited_duplicates
         HAVING (SELECT COUNT(*) FROM duplicates) > 0
     """,
@@ -82,14 +86,14 @@ SQL_MACROS = {
             SELECT ROW_NUMBER() OVER() AS row_pos
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NULL
-            {{ db_functions.limit(10) }} 
+            {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Null values found in {{ column_name }}' AS message,
-            'Row positions: ' || {{ db_functions.string_agg(db_functions.cast_text('row_pos')) }} AS invalid_examples
+            'Row positions: ' || {{ db_functions.string_agg('row_pos') }} AS invalid_examples
         FROM null_positions
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) > 0
     """,
@@ -114,7 +118,7 @@ SQL_MACROS = {
             AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Invalid email format found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg(column_name) }} AS invalid_examples
         FROM invalid_emails
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
@@ -133,7 +137,7 @@ SQL_MACROS = {
                 ON main.{{ column_name }} = ref.{{ reference_column }}
             WHERE main.{{ column_name }} IS NOT NULL
             AND ref.{{ reference_column }} IS NULL
-            {{ db_functions.limit(10) }} 
+            {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
@@ -145,12 +149,12 @@ SQL_MACROS = {
             AND ref.{{ reference_column }} IS NULL) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Foreign key violations found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text('main.' + column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg('main.' + column_name) }} AS invalid_examples
         FROM orphan_keys
         HAVING (SELECT COUNT(*) 
                 FROM {{ schema }}.{{ model_name }} main
                 LEFT JOIN {{ schema }}.{{ reference_table }} ref 
-                    ON main.{{ column_name }} = ref.{{ reference_column }}
+                ON main.{{ column_name }} = ref.{{ reference_column }}
                 WHERE main.{{ column_name }} IS NOT NULL
                 AND ref.{{ reference_column }} IS NULL) > 0
     """,
@@ -164,8 +168,8 @@ SQL_MACROS = {
             SELECT {{ column_name }}
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
-            AND {{ column_name }} > {{ db_functions.current_date() }}   
-            {{ db_functions.limit(10) }}                                 
+            AND {{ column_name }} > {{ db_functions.current_date() }}
+            {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
@@ -175,7 +179,7 @@ SQL_MACROS = {
             AND {{ column_name }} > {{ db_functions.current_date() }}) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Future dates found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg(column_name) }} AS invalid_examples
         FROM future_dates
         HAVING (SELECT COUNT(*) 
                 FROM {{ schema }}.{{ model_name }}
@@ -196,7 +200,7 @@ SQL_MACROS = {
                     '{{ value }}'{% if not loop.last %},{% endif %}
                 {% endfor %}
             )
-            {{ db_functions.limit(10) }} 
+            {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
@@ -210,7 +214,7 @@ SQL_MACROS = {
             )) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Invalid values found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg(column_name) }} AS invalid_examples
         FROM invalid_values
         HAVING (SELECT COUNT(*) 
                 FROM {{ schema }}.{{ model_name }}
@@ -261,7 +265,7 @@ SQL_MACROS = {
             )) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Values outside allowed range in {{ column_name }}' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text(column_name)) }} AS invalid_examples
+            {{ db_functions.string_agg(column_name) }} AS invalid_examples
         FROM out_of_range
         HAVING (SELECT COUNT(*)
                 FROM {{ schema }}.{{ model_name }}
@@ -287,7 +291,7 @@ SQL_MACROS = {
             SELECT 
                 'data_freshness' AS column_name,
                 CASE 
-                    WHEN MAX({{ column_name }}) < {{ db_functions.current_date() }} - INTERVAL '{{ max_age_days }} days' THEN 1
+                    WHEN MAX({{ column_name }}) < {{ db_functions.date_sub(db_functions.current_date(), max_age_days) }} THEN 1
                     ELSE 0
                 END AS failed_rows,
                 1 AS total_rows,
@@ -297,7 +301,7 @@ SQL_MACROS = {
                     ', Expected within: ',
                     '{{ max_age_days }} days'
                 ) AS message,
-                'Latest date found: ' || {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }} AS invalid_examples
+                CONCAT('Latest date found: ', {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }}) AS invalid_examples
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
         ) 
@@ -343,17 +347,22 @@ SQL_MACROS = {
                 actual_percentage,
                 expected_percentage,
                 percentage_diff,
-                CONCAT({{ db_functions.cast_text(column_name) }}, ' (', ROUND(actual_percentage, 1), '% vs ', expected_percentage, '% expected)') AS violation_detail
+                CONCAT(
+                    {{ db_functions.cast_text(column_name) }},
+                    ' (',
+                    ROUND(actual_percentage, 1), '% vs ',
+                    expected_percentage, '% expected)'
+                ) AS violation_detail
             FROM benchmark_comparison
             WHERE percentage_diff > {{ threshold }} * 100
-            {{ db_functions.limit(10) }}  
+            {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
             (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) AS failed_rows,
             (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Benchmark violations found in distribution' AS message,
-            {{ db_functions.string_agg(db_functions.cast_text('violation_detail')) }} AS invalid_examples
+            {{ db_functions.string_agg('violation_detail') }} AS invalid_examples
         FROM violations
         HAVING (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) > 0
     """,
@@ -384,8 +393,8 @@ SQL_MACROS = {
                 {% endif %}
             FROM {{ table_ref }}
             WHERE DATE(created_at) BETWEEN 
-                {{ db_functions.current_date() }} - INTERVAL '{{ window_days or 30 }} days'
-            AND {{ db_functions.current_date() }} - INTERVAL '1 day'
+                {{ db_functions.date_sub(db_functions.current_date(), window_days or 30) }}
+            AND {{ db_functions.date_sub(db_functions.current_date(), 1) }}
             GROUP BY DATE(created_at)
         ),
         current_value AS (
@@ -443,21 +452,22 @@ SQL_MACROS = {
             threshold_exceeded AS failed_rows,
             1 AS total_rows,
             CONCAT(
-                'Statistical threshold exceeded: current=', 
-                ROUND(c.current_metric, 2), 
-                ', threshold=', 
+                'Statistical threshold exceeded: current=',
+                ROUND(current_metric, 2),
+                ', threshold=',
                 ROUND(threshold_value, 2),
                 ', historical_avg=',
                 ROUND(COALESCE(avg_metric, 0), 2)
             ) AS message,
             CONCAT(
-                'Current: ', ROUND(c.current_metric, 2), 
-                ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2), 
+                'Current: ', ROUND(current_metric, 2),
+                ', Historical avg: ', ROUND(COALESCE(avg_metric, 0), 2),
                 ', Threshold: ', ROUND(threshold_value, 2)
             ) AS invalid_examples
-        FROM threshold_check c
+        FROM threshold_check
         WHERE threshold_exceeded = 1
     """,
+
 
     'custom_sql': """
         -- Test: Custom SQL validation
