@@ -149,14 +149,16 @@ SQL_MACROS = {
             AND ref.{{ reference_column }} IS NULL) AS failed_rows,
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Foreign key violations found in {{ column_name }}' AS message,
-            {{ db_functions.string_agg('main.' + column_name) }} AS invalid_examples
+            {{ db_functions.string_agg('orphan_keys.' + column_name) }} AS invalid_examples
         FROM orphan_keys
-        HAVING (SELECT COUNT(*) 
-                FROM {{ schema }}.{{ model_name }} main
-                LEFT JOIN {{ schema }}.{{ reference_table }} ref 
+        HAVING (
+            SELECT COUNT(*) 
+            FROM {{ schema }}.{{ model_name }} main
+            LEFT JOIN {{ schema }}.{{ reference_table }} ref 
                 ON main.{{ column_name }} = ref.{{ reference_column }}
-                WHERE main.{{ column_name }} IS NOT NULL
-                AND ref.{{ reference_column }} IS NULL) > 0
+            WHERE main.{{ column_name }} IS NOT NULL
+            AND ref.{{ reference_column }} IS NULL
+        ) > 0
     """,
 
     'future_date': """

@@ -1,0 +1,25 @@
+name: advanced_example
+version: 1.0.0
+profile: advanced_example
+
+model-paths: ["models"]
+target-path: "target"
+log-path: "logs"
+
+
+alerting:
+  enabled_channels: [""]  #emails functionnel, "teams"
+  slack:
+    enabled: true
+    webhook_url: "https://hooks.slack.com/services/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" #"${SLACK_WEBHOOK_URL}"
+  
+  
+  email:
+    enabled: true
+    smtp_server: "smtp.gmail.com"       # exemple : serveur SMTP
+    smtp_port: 587
+    username: ""
+    password: "vxsh icla aqik zzrh" #"${EMAIL_PASSWORD}"  # App password for Gmail
+    from_email: ""
+    to_emails:
+      - ""

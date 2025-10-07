@@ -142,6 +142,8 @@ class ConnectionManager:
         """Create quality monitoring tables in the quality database"""
         
         schema = self.quality_config.get('schema', 'public')
+    
+        create_schema_sql = f"CREATE SCHEMA IF NOT EXISTS {schema}"
         
         # Table 1: quality_test_results
         quality_test_results_sql = f"""
@@ -157,7 +159,10 @@ class ConnectionManager:
                 failed_rows INTEGER,
                 total_rows INTEGER,
                 execution_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                target_environment VARCHAR(50)
+                target_environment VARCHAR(50),
+                explanation TEXT,
+                examples TEXT,
+                query TEXT
             )
         """
         
@@ -201,8 +206,11 @@ class ConnectionManager:
             quality_anomalies_sql = self._adapt_sql_for_bigquery(quality_anomalies_sql)
         
         try:
-            # CORRECTION : Utiliser quality_engine avec begin()
+            
             with self.quality_engine.begin() as conn:
+                if self.quality_db_type != 'bigquery':
+                    logging.info(f"Creating schema if not exists: {schema}")
+                    conn.execute(text(create_schema_sql))
                 conn.execute(text(quality_test_results_sql))
                 conn.execute(text(quality_run_summary_sql))
                 conn.execute(text(quality_anomalies_sql))
