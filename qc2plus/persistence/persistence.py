@@ -143,6 +143,7 @@ class PersistenceManager:
         try:
             anomaly_records = []
             
+            
             # Extract anomalies from Level 2 results
             for model_name, model_results in results.get('models', {}).items():
                 
@@ -150,14 +151,19 @@ class PersistenceManager:
                     if isinstance(analyzer_result, dict) and not analyzer_result.get('passed', True):
                         
                         details = analyzer_result.get('details', {})
+                        target_environment = results.get('target', 'unknown')
                         
                         # Extract specific anomalies based on analyzer type
                         if analyzer_name == 'correlation':
-                            anomalies = self._extract_correlation_anomalies(details, model_name, analyzer_name)
+                            anomalies = self._extract_correlation_anomalies(
+                                details
+                                ,model_name
+                                , analyzer_name
+                                ,target_environment)
                         elif analyzer_name == 'temporal':
-                            anomalies = self._extract_temporal_anomalies(details, model_name, analyzer_name)
+                            anomalies = self._extract_temporal_anomalies(details, model_name, analyzer_name, target_environment)
                         elif analyzer_name == 'distribution':
-                            anomalies = self._extract_distribution_anomalies(details, model_name, analyzer_name)
+                            anomalies = self._extract_distribution_anomalies(details, model_name, analyzer_name, target_environment)
                         else:
                             # Generic anomaly
                             anomalies = [{
@@ -170,7 +176,7 @@ class PersistenceManager:
                                 'anomaly_details': json.dumps(analyzer_result),
                                 'detection_time': datetime.now(),
                                 'severity': 'medium',
-                                'target_environment': results.get('target', 'unknown')
+                                'target_environment': target_environment
                             }]
                         
                         anomaly_records.extend(anomalies)
@@ -250,7 +256,7 @@ class PersistenceManager:
             self.connection_manager.execute_sql(sql, params=record, use_data_source=False)
     
     def _extract_correlation_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                     analyzer_name: str) -> List[Dict[str, Any]]:
+                                     analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
         """Extract correlation-specific anomalies"""
         
         anomalies = []
@@ -268,7 +274,7 @@ class PersistenceManager:
                 'anomaly_details': json.dumps(anomaly),
                 'detection_time': datetime.now(),
                 'severity': anomaly.get('severity', 'medium'),
-                'target_environment': 'unknown'  # Will be set by caller
+                'target_environment': target_environment   # Will be set by caller
             })
         
         # Temporal correlation anomalies
@@ -290,7 +296,7 @@ class PersistenceManager:
         return anomalies
     
     def _extract_temporal_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                  analyzer_name: str) -> List[Dict[str, Any]]:
+                                  analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
         """Extract temporal-specific anomalies"""
         
         anomalies = []
@@ -310,13 +316,13 @@ class PersistenceManager:
                     'anomaly_details': json.dumps(anomaly),
                     'detection_time': datetime.now(),
                     'severity': anomaly.get('severity', 'medium'),
-                    'target_environment': 'unknown'
+                    'target_environment': target_environment
                 })
         
         return anomalies
     
     def _extract_distribution_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                      analyzer_name: str) -> List[Dict[str, Any]]:
+                                      analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
         """Extract distribution-specific anomalies"""
         
         anomalies = []
@@ -336,7 +342,7 @@ class PersistenceManager:
                     'anomaly_details': json.dumps(anomaly),
                     'detection_time': datetime.now(),
                     'severity': anomaly.get('severity', 'medium'),
-                    'target_environment': 'unknown'
+                    'target_environment': target_environment
                 })
         
         # Extract cross-segment anomalies
@@ -352,7 +358,7 @@ class PersistenceManager:
                 'anomaly_details': json.dumps(anomaly),
                 'detection_time': datetime.now(),
                 'severity': anomaly.get('severity', 'medium'),
-                'target_environment': 'unknown'
+                'target_environment': target_environment
             })
         
         return anomalies
