@@ -122,6 +122,7 @@ class ConnectionManager:
                 else:
                     result = conn.execute(text("SELECT 1"))
                 result.fetchone()
+            logging.info("✅ DATA source: OK")
             
             # Test quality database connection (if different)
             if self.data_engine != self.quality_engine:
@@ -131,6 +132,7 @@ class ConnectionManager:
                     else:
                         result = conn.execute(text("SELECT 1"))
                     result.fetchone()
+                logging.info("✅ QUALITY output: OK")
                     
             return True
                 
