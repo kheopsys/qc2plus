@@ -1,0 +1,56 @@
+models:
+  - name: user_sessions
+    description: "Advanced Level 1 + Level 2 ML tests"
+
+    #sample:
+      #method: random
+      #size: 3         # size for random/sample methods
+    #  partitioned_by: session_date    # Column to partition by (for partitioned tables)
+    #  partition_strategy: latest  # Options: latest, range, list
+    #  partition_count: 2  # Number of partitions to include (for range/list strategies)
+
+
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: session_id
+            severity: critical
+            sample: null 
+
+        - not_null:
+            column_name: user_id
+            severity: critical
+            # sample:
+            #   method: random
+            #   size: 5
+
+        - future_date:
+            column_name: session_date
+            # sample:
+            #   partitioned_by: session_date
+            #   partition_strategy: latest
+              
+        - range_check:
+            column_name: page_views
+            min_value: 1
+            severity: medium
+            # sample:
+            #   method: random
+            #   percentage: 0.1
+
+
+        - freshness:
+            column_name: session_date
+            max_age_days: 2
+            severity: critical
+
+
+      level2:
+        temporal_analysis:
+          anomaly_detection: true  
+          date_column: session_date
+          metrics: [count, sum_page_views]
+          seasonality_check: false
+          window_days: 7
+          frequency: daily
+      

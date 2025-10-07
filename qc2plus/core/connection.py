@@ -94,20 +94,32 @@ class ConnectionManager:
             logging.error(f"Query execution failed: {str(e)}")
             raise
     
+
     def execute_sql(self, sql: str, params: Optional[Dict[str, Any]] = None, use_data_source: bool = False) -> Any:
         """Execute SQL statement (for non-SELECT queries)"""
         try:
-            # Quality operations (INSERT/UPDATE/DELETE) go to quality DB by default
-            # Data operations use data source
+            from datetime import datetime, timezone
+
             engine = self.data_engine if use_data_source else self.quality_engine
-            
-            with engine.begin() as conn:  # Use begin() for auto-commit
-                if params:
-                    clean_params = dict(params) if params else {}
-                    result = conn.execute(text(sql), clean_params)
-                else:
-                    result = conn.execute(text(sql))
+
+            # 🔹 Convert Python datetime to BigQuery-compatible TIMESTAMP string
+            if params:
+                clean_params = dict(params)
+                if self.quality_db_type == "bigquery":
+                    for key, value in clean_params.items():
+                        if isinstance(value, datetime):
+                            # Si datetime sans timezone → ajouter UTC
+                            if value.tzinfo is None:
+                                value = value.replace(tzinfo=timezone.utc)
+                            # Convertir en ISO 8601 compatible TIMESTAMP BigQuery
+                            clean_params[key] = value.isoformat()
+            else:
+                clean_params = {}
+
+            with engine.begin() as conn:
+                result = conn.execute(text(sql), clean_params)
                 return result
+
         except Exception as e:
             logging.error(f"SQL execution failed: {str(e)}")
             raise
@@ -230,6 +242,10 @@ class ConnectionManager:
         sql = sql.replace('INTEGER', 'INT64')
         sql = sql.replace('DECIMAL(10,4)', 'FLOAT64')
         sql = sql.replace('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP()')
+
+        sql = sql.replace('PRIMARY KEY', '')
+        sql = sql.replace('NOT NULL', '') 
+
         return sql
     
     @property 

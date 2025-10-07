@@ -1,0 +1,65 @@
+models:
+  - name: orders
+    description: "Advanced Level 1 + Level 2 ML tests"
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: order_id
+            severity: critical
+        - not_null:
+            column_name: customer_id
+            severity: critical
+        - not_null:
+            column_name: order_date
+            severity: critical
+        - not_null:
+            column_name: total_amount
+            severity: critical
+        - relationship:
+            column_name: customer_id
+            reference_table: customers
+            reference_column: customer_id
+            severity: critical
+        - future_date:
+            column_name: order_date
+        - freshness:
+            column_name: created_at
+            max_age_days: 2
+            severity: critical
+
+        - statistical_threshold:
+            metric: count
+            threshold_type: relative
+            threshold_value: 2.0  
+            window_days: 30
+            severity: medium
+
+
+      level2:
+
+        correlation_analysis:
+          variables: [total_amount, customer_id]
+          expected_correlation: None
+          threshold: 0.3
+          window_days: 20
+          date_column: created_at
+          
+  
+        temporal_analysis:
+          date_column: order_date
+          metrics: [count, sum_total_amount]
+          seasonality_check: true
+          window_days: 10   
+          frequency: monthly 
+
+        distribution_analysis:
+          segments: [status]
+          #segments_source: customers.country on customers.id
+          metrics: [count, sum_total_amount]
+          reference_period: 10
+          comparison_period: 7
+          date_column: order_date
+          behavior_change_threshold: 80
+          #sample
+          #partitionned_by: status  # ex: country, status...
+          #severity: high

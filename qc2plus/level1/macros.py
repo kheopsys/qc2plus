@@ -3,8 +3,6 @@
 Jinja2 templates for business rule validation tests
 """
 
-## Remplacez vos templates dans macros.py par ces versions corrigées :
-
 from typing import Any, Dict, Optional
 
 DB_FUNCTIONS = {
@@ -16,7 +14,8 @@ DB_FUNCTIONS = {
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
         'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'"
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_cast': lambda col: f"CAST({col} AS DATE)" 
     },
     'bigquery': {
         'string_agg': lambda col: f"STRING_AGG(CAST({col} AS STRING), ', ')",
@@ -26,7 +25,8 @@ DB_FUNCTIONS = {
         'random_func': lambda: "RAND()",
         'coalesce': lambda a, b: f"IFNULL({a}, {b})",
         'regex_not_match': lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, r'{pattern}')",
-        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)"
+        'date_sub': lambda date_col, days: f"DATE_SUB(CURRENT_DATE(), INTERVAL {days} DAY)",
+        'date_cast': lambda col: f"DATE({col})"
     },
     'snowflake': {
         'string_agg': lambda col: f"LISTAGG({col}, ', ')",
@@ -36,7 +36,8 @@ DB_FUNCTIONS = {
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
         'regex_not_match': lambda col, pattern: f"NOT REGEXP_LIKE({col}, '{pattern}')",
-        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})"
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_cast': lambda col: f"CAST({col} AS DATE)"
     },
     'redshift': {
         'string_agg': lambda col: f"LISTAGG({col}, ', ')",
@@ -46,7 +47,8 @@ DB_FUNCTIONS = {
         'random_func': lambda: "RANDOM()",
         'coalesce': lambda a, b: f"COALESCE({a}, {b})",
         'regex_not_match': lambda col, pattern: f"NOT ({col} ~ '{pattern}')",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'"
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_cast': lambda col: f"CAST({col} AS DATE)"
     }
 }
 
@@ -293,7 +295,7 @@ SQL_MACROS = {
             SELECT 
                 'data_freshness' AS column_name,
                 CASE 
-                    WHEN MAX({{ column_name }}) < {{ db_functions.date_sub(db_functions.current_date(), max_age_days) }} THEN 1
+                    WHEN {{ db_functions.date_cast('MAX(' ~ column_name ~ ')') }} < {{ db_functions.date_sub(db_functions.current_date(), max_age_days) }} THEN 1
                     ELSE 0
                 END AS failed_rows,
                 1 AS total_rows,

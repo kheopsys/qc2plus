@@ -1,0 +1,34 @@
+models:
+  - name: customers
+    description: "Advanced Level 1 + Level 2 ML tests"
+    # sample:
+    #   method: random
+    #   percentage: 0.2
+    #   partitioned_by: created_at
+    #   partition_strategy: latest
+      
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: customer_id
+            severity: critical
+            sample: null  #not using model-level sample config
+        - email_format:
+            column_name: email
+            severity: medium
+        - range_check:
+            column_name: age
+            min_value: 18
+            max_value: 120
+            severity: medium
+
+
+      level2:
+        - distribution_analysis:
+          segments: [country, status]
+          metrics: [count]
+          date_column: created_at
+          reference_period: 30
+          comparison_period: 7
+        
+        
