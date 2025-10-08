@@ -208,7 +208,6 @@ class ConnectionManager:
             quality_anomalies_sql = self._adapt_sql_for_bigquery(quality_anomalies_sql)
         
         try:
-            
             with self.quality_engine.begin() as conn:
                 if self.quality_db_type != 'bigquery':
                     logging.info(f"Creating schema if not exists: {schema}")
