@@ -5,6 +5,7 @@ Jinja2 templates for business rule validation tests
 
 from typing import Any, Dict, Optional
 
+
 DB_FUNCTIONS = {
     'postgresql': {
         'string_agg': lambda col: f"STRING_AGG({col}::text, ', ')",
