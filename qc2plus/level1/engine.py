@@ -132,17 +132,17 @@ class Level1Engine:
 
         # Déterminer le type de base de données
         db_type = self.connection_manager.db_type if self.connection_manager else 'postgresql'
-        
+
         # Sélectionner uniquement les fonctions de la DB courante
         db_functions = DB_FUNCTIONS.get(db_type, DB_FUNCTIONS['postgresql'])
 
-        # Préparer le contexte pour le rendu Jinja
         context = {
             'model_name': model_name,
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
             'sample_config': sample_config,
             'db_functions': db_functions,
+            'db_type': db_type,
             **test_params
         }
 

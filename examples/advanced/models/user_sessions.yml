@@ -1,57 +1,81 @@
 models:
   - name: user_sessions
-    description: "Advanced Level 1 + Level 2 ML tests"
+    description: "Full coverage for session integrity, freshness and behavioral analytics"
 
-    #sample:
-      #method: random
-      #size: 3         # size for random/sample methods
-    #  partitioned_by: session_date    # Column to partition by (for partitioned tables)
-    #  partition_strategy: latest  # Options: latest, range, list
-    #  partition_count: 2  # Number of partitions to include (for range/list strategies)
-
+    sample:
+      method: random
+      size: 3
+      partitioned_by: session_date
+      partition_strategy: latest
+      partition_count: 2
 
     qc2plus_tests:
       level1:
+        # 🆔 1. Unicité de session_id
         - unique:
             column_name: session_id
             severity: critical
-            sample: null 
 
+        # 👤 2. user_id obligatoire
         - not_null:
             column_name: user_id
             severity: critical
-            sample:
-              method: random
-              size: 5
 
+        # 📅 3. Dates futures interdites
         - future_date:
             column_name: session_date
-            sample:
-              partitioned_by: session_date
-              partition_strategy: latest
-              
+            severity: high
+
+        # 📊 4. Nombre de pages vues valide
         - range_check:
             column_name: page_views
             min_value: 1
+            max_value: 200
             severity: medium
-            sample:
-              method: random
-              percentage: 0.1
 
-
+        # ⏳ 5. Données fraîches
         - freshness:
             column_name: session_date
-            max_age_days: 2
+            max_age_days: 3
             severity: critical
 
+        # 🧩 6. Custom SQL : détecter les sessions "anormales" (> 80 pages vues)
+        - custom_sql:
+            custom_sql: |
+              SELECT 
+                'page_views_outlier' AS column_name,
+                COUNT(*) AS failed_rows,
+                (SELECT COUNT(*) FROM demo.user_sessions) AS total_rows,
+                'Sessions with abnormally high page_views (> 80)' AS message
+              FROM demo.user_sessions
+              WHERE page_views > 80
+              HAVING COUNT(*) > 0
+            severity: medium
 
       level2:
-        temporal_analysis:
-          anomaly_detection: true  
-          date_column: session_date
-          metrics: [count, sum_page_views]
-          seasonality_check: false
-          window_days: 7
-          frequency: daily
-      
+        # 📈 1. Analyse temporelle (tendances et anomalies)
+        - temporal_analysis:
+            date_column: session_date
+            metrics: [count, sum_page_views]
+            anomaly_detection: true
+            seasonality_check: false
+            window_days: 7
+            frequency: daily
+            severity: medium
 
+        # 📊 2. Analyse de distribution : concentration d’activité par utilisateur
+        - distribution_analysis:
+            segments: [user_id]
+            metrics: [count, sum_page_views]
+            date_column: session_date
+            reference_period: 7
+            comparison_period: 2
+            behavior_change_threshold: 100
+            severity: medium
+
+        # 🧮 3. Corrélation entre nombre de pages vues et activité journalière
+        - correlation_analysis:
+            variables: [page_views, session_date]
+            expected_correlation: 0.0
+            threshold: 0.5
+            severity: low

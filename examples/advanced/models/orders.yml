@@ -1,11 +1,28 @@
 models:
   - name: orders
-    description: "Advanced Level 1 + Level 2 ML tests"
+    description: "Comprehensive QC2+ plan for the Orders model with Level 1 & 2 checks"
+
+    sample:
+      method: random
+      percentage: 0.25
+      partitioned_by: order_date
+      partition_strategy: latest
+
     qc2plus_tests:
       level1:
+        # 🔹 1. Identifiants uniques
         - unique:
             column_name: order_id
             severity: critical
+
+        # 🔹 2. Références clients valides
+        - relationship:
+            column_name: customer_id
+            reference_table: customers
+            reference_column: customer_id
+            severity: critical
+
+        # 🔹 3. Valeurs obligatoires
         - not_null:
             column_name: customer_id
             severity: critical
@@ -15,52 +32,120 @@ models:
         - not_null:
             column_name: total_amount
             severity: critical
-        - relationship:
-            column_name: customer_id
-            reference_table: customers
-            reference_column: customer_id
-            severity: critical
+
+        # 🔹 4. Valeurs futures interdites
         - future_date:
             column_name: order_date
+            severity: high
+
+        # 🔹 5. Fraîcheur des données (ingestion)
         - freshness:
             column_name: created_at
-            max_age_days: 2
-            severity: critical
+            max_age_days: 3
+            severity: high
 
+        # 🔹 6. Valeurs acceptées pour le statut
+        - accepted_values:
+            column_name: status
+            accepted_values: ['pending', 'completed', 'cancelled']
+            severity: medium
+
+        # 🔹 7. Vérification du montant positif
+        - range_check:
+            column_name: total_amount
+            min_value: 0
+            max_value: 10000
+            severity: medium
+
+        # 🔹 8. Vérification de cohérence temporelle (pas trop ancienne)
+        - range_check:
+            column_name: order_date
+            min_value: '2020-01-01'
+            severity: low
+
+        # 🔹 9. Seuil statistique sur le volume de commandes
         - statistical_threshold:
             metric: count
             threshold_type: relative
-            threshold_value: 2.0  
+            threshold_value: 2.0
             window_days: 30
             severity: medium
 
+        # 🔹 10. Test métier : montants anormalement élevés (>1000€)
+        # - custom_sql:
+        #     custom_sql: |
+        #       SELECT 
+        #         'high_value_orders' AS column_name,
+        #         COUNT(*) AS failed_rows,
+        #         (SELECT COUNT(*) FROM demo.orders) AS total_rows,
+        #         'More than 5% of orders exceed 1000€' AS message
+        #       FROM demo.orders
+        #       WHERE total_amount > 1000
+        #       HAVING COUNT(*) > 0.05 * (SELECT COUNT(*) FROM demo.orders)
+        #     severity: critical
+# 
+        # # 🔹 11. Test métier : commandes sans client existant
+        # - custom_sql:
+        #     custom_sql: |
+        #       SELECT
+        #         'orphan_orders' AS column_name,
+        #         COUNT(*) AS failed_rows,
+        #         (SELECT COUNT(*) FROM demo.orders) AS total_rows,
+        #         'Orders with unknown customer_id' AS message
+        #       FROM demo.orders o
+        #       LEFT JOIN demo.customers c
+        #         ON o.customer_id = c.customer_id
+        #       WHERE c.customer_id IS NULL
+        #       HAVING COUNT(*) > 0
+        #     severity: critical
 
       level2:
+        # 📈 1. Corrélation entre total_amount et client_id (proxy d’activité)
+        - correlation_analysis:
+            variables: [total_amount, customer_id]
+            expected_correlation: 0.0
+            threshold: 0.3
+            window_days: 30
+            date_column: order_date
+            severity: low
 
-        correlation_analysis:
-          variables: [total_amount, customer_id]
-          expected_correlation: None
-          threshold: 0.3
-          window_days: 20
-          date_column: created_at
-          
-  
-        temporal_analysis:
-          date_column: order_date
-          metrics: [count, sum_total_amount]
-          seasonality_check: true
-          window_days: 10   
-          frequency: monthly 
+        # 📅 2. Analyse temporelle des commandes
+        - temporal_analysis:
+            date_column: order_date
+            metrics: [count, sum_total_amount]
+            seasonality_check: true
+            anomaly_detection: true
+            window_days: 30
+            frequency: daily
+            severity: medium
 
-        distribution_analysis:
-          segments: [status]
-          #segments_source: customers.country on customers.id
-          metrics: [count, sum_total_amount]
-          reference_period: 10
-          comparison_period: 7
-          date_column: order_date
-          behavior_change_threshold: 80
-          #sample
-          #partitionned_by: status  # ex: country, status...
-          #severity: high
+        # 📊 3. Distribution des statuts de commandes
+        - distribution_analysis:
+            segments: [status]
+            metrics: [count, sum_total_amount]
+            reference_period: 15
+            comparison_period: 7
+            date_column: order_date
+            behavior_change_threshold: 80
+            severity: medium
 
+        # 💸 4. Analyse du panier moyen (test métier) !!!! ERROR IN THE QUERY ORDER DATE
+        # - custom_sql:
+        #     custom_sql: |
+        #       SELECT
+        #         'avg_basket_drop' AS column_name,
+        #         COUNT(*) AS failed_rows,
+        #         (SELECT COUNT(*) FROM demo.orders) AS total_rows,
+        #         'Average order amount dropped by >40% vs last 7 days' AS message
+        #       FROM (
+        #         SELECT 
+        #           AVG(total_amount) AS current_avg
+        #           , (SELECT AVG(total_amount)
+        #              FROM demo.orders
+        #              WHERE order_date BETWEEN CURRENT_DATE - INTERVAL '14 days'
+        #              AND CURRENT_DATE - INTERVAL '7 days') AS previous_avg
+        #         FROM demo.orders
+        #         WHERE order_date >= CURRENT_DATE - INTERVAL '7 days'
+        #       ) AS agg
+        #       WHERE current_avg < 0.6 * previous_avg
+        #     severity: high
