@@ -59,7 +59,6 @@ DB_FUNCTIONS = {
     }
 }
 
-
 SQL_MACROS = {
     'unique': """
         -- Test: Unique constraint on {{ column_name }}
@@ -530,7 +529,6 @@ SQL_MACROS = {
         {{ custom_sql }}
     """,
 }
-
 
 def get_macro_help(macro_name: str) -> str:
     """Get help text for a specific macro"""
