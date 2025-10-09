@@ -10,12 +10,11 @@ numpy>=1.21.0
 psycopg2-binary>=2.9.0
 snowflake-sqlalchemy>=1.4.0
 google-cloud-bigquery>=3.0.0
+google-cloud-bigquery-storage>=2.16.0 
 redshift-connector>=2.0.0
 pymysql>=1.0.0
 sqlalchemy>=1.4.0
 sqlalchemy-bigquery>=1.6.0 
-google-cloud-bigquery-storage>=2.16.0 
-# ML and statistics
 scikit-learn>=1.0.0
 scipy>=1.7.0
 statsmodels>=0.13.0

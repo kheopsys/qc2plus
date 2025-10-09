@@ -9,7 +9,33 @@ import pandas as pd
 from typing import Dict, List, Any, Optional
 
 from qc2plus.core.connection import ConnectionManager
+DB_LEVEL2_FUNCTIONS = {
+    'postgresql': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'bigquery': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
+        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
+        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
 
+    'snowflake': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+}
 class DistributionAnalyzer:
     """Analyzes data distributions - Focus on segment shifts and behavior anomalies"""
     
@@ -25,7 +51,18 @@ class DistributionAnalyzer:
             metrics = config.get('metrics', ['count'])
             reference_period = config.get('reference_period', 30)
             comparison_period = config.get('comparison_period', 7)
-            date_column = config.get('date_column', 'created_at')
+            date_column = config.get('date_column', None)
+            if date_column is None:
+                logging.info(f"No date_column specified for {model_name}, skipping distribution analysis")
+                return {
+                'passed': True,
+                'anomalies_count': 0,
+                'message': 'Distribution analysis skipped (no date column specified)',
+                'details': {
+                    'skipped': True,
+                    'reason': 'No date_column configured'
+                    }
+                }
             
             # Validate configuration
             if not segments:
@@ -81,7 +118,14 @@ class DistributionAnalyzer:
         """Get segmented data for specified period"""
         
         schema = self.connection_manager.config.get('schema', 'public')
-        
+        db_type = self.connection_manager.db_type
+
+        if db_type in DB_LEVEL2_FUNCTIONS:
+            funcs = DB_LEVEL2_FUNCTIONS[db_type]
+        else:
+            logging.warning(f"Unknown db_type '{db_type}', defaulting to PostgreSQL syntax")
+            funcs = DB_LEVEL2_FUNCTIONS['postgresql']
+
         # Build metric aggregations
         metric_clauses = []
         for metric in metrics:
@@ -97,13 +141,17 @@ class DistributionAnalyzer:
                 # Assume it's a column name for sum
                 metric_clauses.append(f'SUM({metric}) as {metric}')
         
+
+        current_date_expr = funcs['current_date']()
+        cast_date_col = funcs['cast_date'](date_column)
+                                           
         if period_type == 'comparison':
-            date_condition = f"{date_column} >= CURRENT_DATE - INTERVAL '{reference_period} days'"
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr, reference_period)}"
         else:  # reference
             total_days = comparison_period + reference_period
             date_condition = f"""
-                {date_column} >= CURRENT_DATE - INTERVAL '{total_days} days' 
-                AND {date_column} < CURRENT_DATE - INTERVAL '{comparison_period} days'
+                {cast_date_col} >= {funcs['date_sub'](current_date_expr, total_days)} 
+                AND {cast_date_col} < {funcs['date_sub'](current_date_expr, comparison_period)}
             """
         
         query = f"""
@@ -117,14 +165,7 @@ class DistributionAnalyzer:
             ORDER BY {', '.join(segments)}
         """
         
-        # Adapt query for different databases
-        if self.connection_manager.db_type == 'bigquery':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace("INTERVAL '", "INTERVAL ")
-            query = query.replace(" days'", " DAY")
-        elif self.connection_manager.db_type == 'snowflake':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace(" days'", " DAY'")
+
 
         data = self.connection_manager.execute_query(query)
 

@@ -16,6 +16,33 @@ import warnings
 from qc2plus.core.connection import ConnectionManager
 
 
+DB_LEVEL2_FUNCTIONS = {
+    'postgresql': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'bigquery': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
+        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
+        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+
+    'snowflake': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+}
 class TemporalAnalyzer:
     """Analyzes temporal patterns and detects time-series anomalies"""
     
@@ -94,20 +121,26 @@ class TemporalAnalyzer:
         """Get temporal data aggregated by specified frequency"""
         
         schema = self.connection_manager.config.get('schema', 'public')
+        db_type = self.connection_manager.db_type
+        #funcs = DB_LEVEL2_FUNCTIONS.get(self.connection_manager.db_type, DB_LEVEL2_FUNCTIONS['postgresql'])
         
-        # Determine aggregation function based on frequency
+        if db_type in DB_LEVEL2_FUNCTIONS:
+            funcs = DB_LEVEL2_FUNCTIONS[db_type]
+        else:
+            logging.warning(f"Unknown db_type '{db_type}', defaulting to PostgreSQL syntax")
+            funcs = DB_LEVEL2_FUNCTIONS['postgresql']
+        
+        funcs = DB_LEVEL2_FUNCTIONS.get(db_type)
+        
         if frequency == 'daily':
-            date_trunc = 'day'
-            interval_clause = f"DATE({date_column})"
+            interval_clause = funcs['date_trunc_day'](date_column)
         elif frequency == 'weekly':
-            date_trunc = 'week'
-            interval_clause = f"DATE_TRUNC('week', {date_column})"
+            interval_clause = funcs['date_trunc_week'](date_column)
         elif frequency == 'monthly':
-            date_trunc = 'month'
-            interval_clause = f"DATE_TRUNC('month', {date_column})"
+            interval_clause = funcs['date_trunc_month'](date_column)
         else:
             # Default to daily
-            interval_clause = f"DATE({date_column})"
+            interval_clause = funcs['date_trunc_day'](date_column)
         
         # Build metric aggregations
         metric_clauses = []
@@ -129,27 +162,20 @@ class TemporalAnalyzer:
             else:
                 # Assume it's a column name for sum
                 metric_clauses.append(f'SUM({metric}) as {metric}')
+
         
+        current_date_expr = funcs['current_date']()
+        cast_date_col = funcs['cast_date'](date_column)
+
         query = f"""
             SELECT 
                 {interval_clause} as period_date,
                 {', '.join(metric_clauses)}
             FROM {schema}.{model_name}
-            WHERE {date_column} >= CURRENT_DATE - INTERVAL '{window_days} days'
+            WHERE {cast_date_col} >= {funcs['date_sub'](current_date_expr, window_days)}
             GROUP BY {interval_clause}
             ORDER BY period_date
         """
-        
-        # Adapt query for different databases
-        if self.connection_manager.db_type == 'bigquery':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace("INTERVAL '", "INTERVAL ")
-            query = query.replace(" days'", " DAY")
-            if frequency != 'daily':
-                query = query.replace('DATE_TRUNC', 'DATE_TRUNC')
-        elif self.connection_manager.db_type == 'snowflake':
-            query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-            query = query.replace(" days'", " DAY'")
         
         return self.connection_manager.execute_query(query)
     

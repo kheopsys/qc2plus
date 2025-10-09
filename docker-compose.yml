@@ -53,7 +53,7 @@ services:
     volumes:
       - ./examples:/app/examples
       - ./logs:/app/logs
-      - ./qc2plus:/app/qc2plus
+      - ./qc2plus:/app/qc2plus     # Only in development mode
     environment:
       - QC2PLUS_LOG_LEVEL=INFO
       - PYTHONUNBUFFERED=1

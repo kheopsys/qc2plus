@@ -109,25 +109,51 @@ models:
             date_column: order_date
             severity: low
 
-        # 📅 2. Analyse temporelle des commandes
+        - correlation_analysis:
+            variables: [total_amount, customer_id]
+            expected_correlation: None
+            threshold: 0.3
+            window_days: 20
+            date_column: created_at
+          
         - temporal_analysis:
             date_column: order_date
             metrics: [count, sum_total_amount]
             seasonality_check: true
-            anomaly_detection: true
-            window_days: 30
-            frequency: daily
-            severity: medium
-
-        # 📊 3. Distribution des statuts de commandes
+            window_days: 10   
+            frequency: monthly 
+#
         - distribution_analysis:
             segments: [status]
+            #segments_source: customers.country on customers.id
             metrics: [count, sum_total_amount]
-            reference_period: 15
+            reference_period: 10
             comparison_period: 7
             date_column: order_date
             behavior_change_threshold: 80
-            severity: medium
+            sample:
+              partitionned_by: status  # ex: country, status...
+              severity: high
+#
+        # # 📅 2. Analyse temporelle des commandes
+        # - temporal_analysis:
+        #     date_column: order_date
+        #     metrics: [count, sum_total_amount]
+        #     seasonality_check: true
+        #     anomaly_detection: true
+        #     window_days: 30
+        #     frequency: daily
+        #     severity: medium
+# 
+        # # 📊 3. Distribution des statuts de commandes
+        # - distribution_analysis:
+        #     segments: [status]
+        #     metrics: [count, sum_total_amount]
+        #     reference_period: 15
+        #     comparison_period: 7
+        #     date_column: order_date
+        #     behavior_change_threshold: 80
+        #     severity: medium
 
         # 💸 4. Analyse du panier moyen (test métier) !!!! ERROR IN THE QUERY ORDER DATE
         # - custom_sql:

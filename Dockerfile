@@ -7,6 +7,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     postgresql-client \
     cron \
+    make \
+    python3-dev \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
