@@ -10,11 +10,17 @@ models:
 
     qc2plus_tests:
       level1:
+<<<<<<< Updated upstream
         # 🔹 1. Identifiants uniques
+=======
+
+      
+>>>>>>> Stashed changes
         - unique:
             column_name: order_id
             severity: critical
 
+<<<<<<< Updated upstream
         # 🔹 2. Références clients valides
         - relationship:
             column_name: customer_id
@@ -23,6 +29,9 @@ models:
             severity: critical
 
         # 🔹 3. Valeurs obligatoires
+=======
+
+>>>>>>> Stashed changes
         - not_null:
             column_name: customer_id
             severity: critical
@@ -99,6 +108,7 @@ models:
         #       HAVING COUNT(*) > 0
         #     severity: critical
 
+<<<<<<< Updated upstream
       level2:
         # 📈 1. Corrélation entre total_amount et client_id (proxy d’activité)
         - correlation_analysis:
@@ -149,3 +159,16 @@ models:
         #       ) AS agg
         #       WHERE current_avg < 0.6 * previous_avg
         #     severity: high
+=======
+
+
+      level2:
+        correlation_analysis:
+          variables: [total_amount, customer_id]
+          expected_correlation: 0.9
+          threshold: 0.1
+          window_days: 20
+          date_column: created_at
+          
+          
+>>>>>>> Stashed changes
