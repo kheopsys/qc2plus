@@ -156,7 +156,6 @@ class ConnectionManager:
         """Create quality monitoring tables in the quality database"""
         
         schema = self.quality_config.get('schema', 'public')
-    
         create_schema_sql = f"CREATE SCHEMA IF NOT EXISTS {schema}"
         
         # Table 1: quality_test_results

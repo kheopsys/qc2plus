@@ -9,7 +9,7 @@ zeflix-dev:
         dataset: demo
         schema: demo
         location: US 
-        keyfile: zeflix-dev-817164765e92.json
+        keyfile: zeflix-dev-7adb2837b156.json
       quality_output:
         type: bigquery
         method: service-account
@@ -17,4 +17,4 @@ zeflix-dev:
         dataset: demo
         schema: demo
         location: US
-        keyfile: zeflix-dev-817164765e92.json
+        keyfile: zeflix-dev-7adb2837b156.json

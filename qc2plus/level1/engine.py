@@ -8,9 +8,11 @@ from typing import Dict, List, Any, Optional
 from jinja2 import Environment, BaseLoader
 import pandas as pd
 
-from qc2plus.level1.macros import SQL_MACROS, DB_FUNCTIONS
+from qc2plus.level1.macros import SQL_MACROS
+from qc2plus.sql.db_functions import DB_FUNCTIONS
 from qc2plus.core.connection import ConnectionManager
 
+from qc2plus.level1.utils import get_macro_help, build_sample_clause
 
 class Level1Engine:
     """Level 1 quality test engine for business rule validation"""
@@ -23,7 +25,7 @@ class Level1Engine:
         for macro_name, macro_template in SQL_MACROS.items():
             self.jinja_env.globals[macro_name] = self._create_macro_function(macro_template)
         
-        from qc2plus.level1.macros import build_sample_clause
+        from qc2plus.level1.utils import build_sample_clause
         self.jinja_env.globals['build_sample_clause'] = build_sample_clause
     
     def _create_macro_function(self, template_str: str):
@@ -132,17 +134,17 @@ class Level1Engine:
 
         # Déterminer le type de base de données
         db_type = self.connection_manager.db_type if self.connection_manager else 'postgresql'
-        
+
         # Sélectionner uniquement les fonctions de la DB courante
         db_functions = DB_FUNCTIONS.get(db_type, DB_FUNCTIONS['postgresql'])
 
-        # Préparer le contexte pour le rendu Jinja
         context = {
             'model_name': model_name,
             'column_name': test_params.get('column_name'),
             'schema': self.connection_manager.config.get('schema', 'public') if self.connection_manager else 'public',
             'sample_config': sample_config,
             'db_functions': db_functions,
+            'db_type': db_type,
             **test_params
         }
 
