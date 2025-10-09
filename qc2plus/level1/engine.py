@@ -8,9 +8,11 @@ from typing import Dict, List, Any, Optional
 from jinja2 import Environment, BaseLoader
 import pandas as pd
 
-from qc2plus.level1.macros import SQL_MACROS, DB_FUNCTIONS
+from qc2plus.level1.macros import SQL_MACROS
+from qc2plus.sql.db_functions import DB_FUNCTIONS
 from qc2plus.core.connection import ConnectionManager
 
+from qc2plus.level1.utils import get_macro_help, build_sample_clause
 
 class Level1Engine:
     """Level 1 quality test engine for business rule validation"""
@@ -23,7 +25,7 @@ class Level1Engine:
         for macro_name, macro_template in SQL_MACROS.items():
             self.jinja_env.globals[macro_name] = self._create_macro_function(macro_template)
         
-        from qc2plus.level1.macros import build_sample_clause
+        from qc2plus.level1.utils import build_sample_clause
         self.jinja_env.globals['build_sample_clause'] = build_sample_clause
     
     def _create_macro_function(self, template_str: str):
