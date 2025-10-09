@@ -1,13 +1,1 @@
-{
-  "type": "service_account",
-  "project_id": "zeflix-dev",
-  "private_key_id": "7adb2837b1563714dfce16eb8186d8ccc09c3858",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC37TpkLY82wzIV\nnimk1bJASBNO9pg30qa7Nukp9ZHJ3CoVne7eDuhLnyuVoQ10M8zvcikutSZqjnyS\nQGkmI18XGDnTMtvb38vwH09hb7IucPJGiZpJG1RZQU1O0vLBAqTDNkscqqg++iBx\nzfPUtEoo5rzJBQN6XnUe+yzpRi8CU5W56ValVMbMH4sKWk9wws7jGHZQo/Km46/G\n2NpghUH05l9T6K88riIMm0xx+EM8w1KtZ8D5H+/SymmPPwkeHPWx1dGdBGE6vI2g\nh2MxN+BqzkSlr5UUq/slsepi3vndAbdiCyArxaua7krm1MTMLqYC6MxkocmvQls1\nASIcdJa7AgMBAAECggEACBKg//mh8hDiN2GwSTxZ7Qlc05fuOXEFAW2ZEU7mfbos\nnLNIYzW7S2pqktA1U3bclVvo49RuobmsTQ0HsHVX/J8DFrqCPOXXQSxWoxuwcepi\nL+dlPrU04BAGMSIAJqmTir/szw7MgKsg1m3oOFtLb/0kpxwRuYLA2EHFCF4cvRjT\n6k4QL6QMVt02oNk7FSH7SuQD5OvQfjvIS0UJRo7rMz+tKLoiT1LLU7N7UcFDPOGQ\nWgcmyGqVeIXsMmTQp0tOmtLLxEwbzr9s4ROBBT1RxAOFYwVWRCmodHeibhH9yVSz\nOSRmNbD6xt1AbsEN/W8OhaNZos/KGodxdmrsKUM7NQKBgQDzeaCJmFH4aUxE/0dp\n7ixxpK3Swu9/wCbuGlQQtiad1O4wYf0X3iNv/oHaVpMQ5lpsY0rFEQ3dRM87Ecvy\nytDAiOfYs2MmCIiLQ0wgbelFvX7Y0Ovo3OBlS8orq1r+joyQqmLfztH3qXkOtZuV\n54CVpAwpJ/2oNdB6RsSqtBS9/QKBgQDBY2VH5KFEZ2do7LGg/plaL03eEyMrNb4A\nAv6TgJzfHXGsLCSLzbCYSnTYCDWKE2mipMGlN6VUAJ5tVpnuIizBlepQvpD63TC0\nfdv7GT95aC2zP1zmbAsTA65wpfIVcWPhiUdkLSTJoLwvEJAFxxWSSfV86MSfSbGZ\n7GCi//IpFwKBgErYDqN9cWU9aTakip1jm8Hrb4ukZN8OgGkdKs5gUAqgk//Hf3fA\nz3/z6pLlnhvJ0+4Rr8BYd7yXFGUCGYGvGvC0pSCWNFpSsTauH06wus63a7DWuE5C\n56/71lAKQtSRmWA3IGHQP/cz34TICuXP3lUhsqNMKct1j3qnGnmnFeE5AoGAdaJ5\nhD7dnhdsPtXjwvO74rDto81uUiVxut4XbzAHvGxTrhB39paa+jgoVRTBRIlEc4vW\nwyJTLgLmW8oW/lTJdsQzcQRKel679r6sZlRYWQh27Bb58qv8HIfbv2giFssPn6x6\nwcP4IbHlZpejk/Ai/gaBDocku2P/ZYr0yZH5AucCgYEAstf2LfeoDrrqXkQ+pcZw\nxs6IEIn87QqYdeWG/BY4evBB96AjtFCz2X2A7OXOmtKPy6soIXaG7f+6+eS4AHyK\n7JArpVjF/XcHWuYQtCSP5FmV0D/848AyMoH7NtbJTUegqiCq0/lLs6KBaQwXlmaq\nHePIzEBu9tvYLoq75LuguAI=\n-----END PRIVATE KEY-----\n",
-  "client_email": "zeflix-qc2@zeflix-dev.iam.gserviceaccount.com",
-  "client_id": "104407068255322468242",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/zeflix-qc2%40zeflix-dev.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+
