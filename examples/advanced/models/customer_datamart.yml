@@ -3,9 +3,12 @@ models:
     description: "Advanced Level 1 + Level 2 ML tests"
     qc2plus_tests:
       level1:
+
         - unique:
             column_name: customer_id
             severity: critical
+
+
         - range_check:
             column_name: lifetime_value
             min_value: 0
@@ -21,6 +24,8 @@ models:
             column_name: customer_segment
             accepted_values: ['Mono-buyer', 'Regular-buyer', 'VIP-buyer']
             severity: critical
+
+
         - accepted_benchmark_values:
             column_name: customer_segment
             benchmark_values:
@@ -41,6 +46,7 @@ models:
                   WHERE customer_segment = 'VIP-buyer'
                   HAVING COUNT(*) > 5
             severity: critical
+
       level2:
         correlation_analysis:
           variables: [lifetime_value, customer_id]
@@ -48,3 +54,4 @@ models:
           threshold: 0.3
 
 
+  

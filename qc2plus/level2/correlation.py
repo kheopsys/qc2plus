@@ -2,7 +2,77 @@
 2QC+ Level 2 Correlation Analysis
 ML-powered correlation anomaly detection
 """
+DB_LEVEL2_FUNCTIONS = {
+    'postgresql': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
+        'random_order': lambda: "ORDER BY RANDOM()",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'mysql': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE({col})",
+        'date_trunc_week': lambda col: f"DATE_FORMAT({col}, '%Y-%u-1')",
+        'date_trunc_month': lambda col: f"DATE_FORMAT({col}, '%Y-%m-01')",
+        'cast_date': lambda col: f"DATE({col})",
+        'random_order': lambda: "ORDER BY RAND()",
+    },
+    'bigquery': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
+        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
+        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
+        'random_order': lambda: "ORDER BY RAND()",
+    },
+    'snowflake': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
+        'random_order': lambda: "ORDER BY RANDOM()",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'redshift': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'random_order': lambda: "ORDER BY RANDOM()",
+    }
+}
+# Au tout début de temporal.py (après les imports)
 
+DB_LEVEL2_FUNCTIONS = {
+    'postgresql': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'bigquery': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
+        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
+        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+    'snowflake': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+}
 import logging
 import numpy as np
 import pandas as pd
@@ -31,8 +101,9 @@ class CorrelationAnalyzer:
             threshold = config.get('threshold', 0.2)
             correlation_type = config.get('correlation_type', 'pearson')
             date_column = config.get('date_column', None)
-            window_days = config.get('window_days', None)
+            window_days = config.get('window_days', None)  # for temporal correlation analysis
             sample_size = config.get('sample_size', 10000) #  used for calculating correlation with no time windows
+            warnings.filterwarnings("ignore", category=RuntimeWarning)  # Suppress warnings from correlation calculations
             # Validate configuration
             if len(variables) < 2:
                 raise ValueError("At least 2 variables required for correlation analysis")
@@ -90,30 +161,27 @@ class CorrelationAnalyzer:
         """Get data for correlation analysis"""
         
         schema = self.connection_manager.config.get('schema', 'public')
+        db_type = self.connection_manager.db_type
+        funcs = DB_LEVEL2_FUNCTIONS.get(db_type, DB_LEVEL2_FUNCTIONS['postgresql'])
         
         # Build query to get aggregated daily data
-        # calculer la co
-        if date_column:
+
+        if date_column and window_days:
+            current_date_expr = funcs['current_date']()
+            #weekly aggregation query
             query = f"""
-                SELECT 
-                    DATE({date_column}) as analysis_date,
-                    {', '.join([f'SUM({var}) as {var}' for var in variables])}
-                FROM {schema}.{model_name}
-                WHERE {date_column} >= CURRENT_DATE - INTERVAL '{window_days} days'
-                GROUP BY DATE({date_column})
-                ORDER BY analysis_date
+            SELECT 
+                {funcs['date_trunc_week'](date_column)} AS analysis_date,
+                {', '.join([f'SUM({var}) AS {var}' for var in variables])}
+            FROM {schema}.{model_name}
+            WHERE CAST({date_column} AS DATE) >= {funcs['date_sub'](current_date_expr, window_days)}
+              AND {' AND '.join([f'{var} IS NOT NULL' for var in variables])}
+            GROUP BY {funcs['date_trunc_week'](date_column)}
+            ORDER BY analysis_date
             """
-          
-            # Adapt query for different databases
-            if self.connection_manager.db_type == 'bigquery':
-                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-                query = query.replace("INTERVAL '", "INTERVAL ")
-                query = query.replace(" days'", " DAY")
-            elif self.connection_manager.db_type == 'snowflake':
-                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-                query = query.replace(" days'", " DAY'")
-        else :
-             # Analyse statique : échantillon de données brutes
+            
+        else:
+            # Simple random sample query
             query = f"""
                 SELECT 
                     {', '.join(variables)}
@@ -122,19 +190,11 @@ class CorrelationAnalyzer:
                 LIMIT {sample_size}
             """
             
-            # Pour améliorer la représentativité, on peut ajouter un échantillonnage aléatoire
-            if self.connection_manager.db_type == 'postgresql':
+            if db_type in ('postgresql', 'redshift', 'snowflake', 'sqlite'):
                 query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
-            elif self.connection_manager.db_type == 'mysql':
+            elif db_type in ('mysql', 'bigquery'):
                 query = query.replace('LIMIT', 'ORDER BY RAND() LIMIT')
-            elif self.connection_manager.db_type == 'bigquery':
-                query = query.replace('LIMIT', 'ORDER BY RAND() LIMIT')
-            elif self.connection_manager.db_type == 'snowflake':
-                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
-            elif self.connection_manager.db_type == 'redshift':
-                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
-            elif self.connection_manager.db_type == 'sqlite':
-                query = query.replace('LIMIT', 'ORDER BY RANDOM() LIMIT')
+
 
         
         return self.connection_manager.execute_query(query)
@@ -143,13 +203,30 @@ class CorrelationAnalyzer:
                                     expected_correlation: Optional[float], threshold: float,
                                     correlation_type: str) -> Dict[str, Any]:
         """Perform static correlation analysis"""
-        
+        # Vérification préalable : toutes les variables doivent être numériques
+        non_numeric_vars = [
+            var for var in variables 
+            if var in data.columns and not pd.api.types.is_numeric_dtype(data[var])
+        ]
+
+        if non_numeric_vars:
+            raise ValueError(
+                f"Non-numeric variables detected: {', '.join(non_numeric_vars)}. "
+                f"Correlation analysis requires only numeric variables. "
+                f"Please exclude or cast them before running the test."
+            )
+
         results = {
             'passed': True,
             'anomalies_count': 0,
             'correlations': {},
             'anomalies': []
         }
+        # Coerce columns to numeric globally (safety net)
+        for c in variables:
+            if c in data.columns:
+                data[c] = pd.to_numeric(data[c], errors='coerce')
+
         
         # Calculate correlations for all variable pairs
         for i in range(len(variables)):
@@ -223,7 +300,7 @@ class CorrelationAnalyzer:
     def _detect_temporal_correlation_changes(self, model_name: str, variables: List[str],
                                            date_column: str, correlation_type: str) -> Dict[str, Any]:
         """Detect changes in correlation over time"""
-        
+
         results = {
             'passed': True,
             'anomalies_count': 0,
@@ -234,33 +311,24 @@ class CorrelationAnalyzer:
         try:
             # Get historical correlation data (weekly windows over last 3 months)
             schema = self.connection_manager.config.get('schema', 'public')
+            db_type = self.connection_manager.db_type
+            funcs = DB_LEVEL2_FUNCTIONS.get(db_type, DB_LEVEL2_FUNCTIONS['postgresql'])
             
             query = f"""
                 WITH weekly_data AS (
                     SELECT 
-                        DATE_TRUNC('week', {date_column}) as week_start,
-                        {', '.join([f'SUM({var}) as {var}' for var in variables])}
+                        {funcs['date_trunc_week'](date_column)} AS week_start,
+                        {', '.join([f'SUM({var}) AS {var}' for var in variables])}
                     FROM {schema}.{model_name}
-                    WHERE {date_column} >= CURRENT_DATE - INTERVAL '90 days'
-                    GROUP BY DATE_TRUNC('week', {date_column})
+                    WHERE CAST({date_column} AS DATE) >= {funcs['date_sub'](funcs['current_date'](), 90)}
+                    GROUP BY {funcs['date_trunc_week'](date_column)}
                     ORDER BY week_start
                 )
                 SELECT * FROM weekly_data
                 WHERE week_start IS NOT NULL
             """
             
-            # Adapt query for different databases
-            if self.connection_manager.db_type == 'bigquery':
-                query = query.replace('DATE_TRUNC', 'DATE_TRUNC')
-                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-                query = query.replace("INTERVAL '", "INTERVAL ")
-                query = query.replace(" days'", " DAY")
-            elif self.connection_manager.db_type == 'snowflake':
-                query = query.replace('CURRENT_DATE', 'CURRENT_DATE()')
-                query = query.replace(" days'", " DAY'")
-            elif self.connection_manager.db_type == 'redshift':
-                query = query.replace('DATE_TRUNC', 'DATE_TRUNC')
-            
+    
             historical_data = self.connection_manager.execute_query(query)
             
             if len(historical_data) < 4:  # Need at least 4 weeks for trend analysis

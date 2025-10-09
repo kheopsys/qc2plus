@@ -64,3 +64,4 @@ models:
           #partitionned_by: status  # ex: country, status...
           #severity: high
 
+  

@@ -21,7 +21,7 @@ DB_FUNCTIONS = {
         'string_agg': lambda col: f"STRING_AGG(CAST({col} AS STRING), ', ')",
         'cast_text': lambda col: f"CAST({col} AS STRING)",
         'limit': lambda n: f"LIMIT {n}",
-        'current_date': lambda: "CURRENT_DATE()",
+        'current_date': lambda: "CURRENT_DATE()" ,
         'random_func': lambda: "RAND()",
         'coalesce': lambda a, b: f"IFNULL({a}, {b})",
         'regex_not_match': lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, r'{pattern}')",

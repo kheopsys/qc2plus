@@ -51,7 +51,7 @@ models:
           seasonality_check: true
           window_days: 10   
           frequency: monthly 
-
+#
         distribution_analysis:
           segments: [status]
           #segments_source: customers.country on customers.id
@@ -60,6 +60,7 @@ models:
           comparison_period: 7
           date_column: order_date
           behavior_change_threshold: 80
-          #sample
-          #partitionned_by: status  # ex: country, status...
-          #severity: high
+          sample:
+            partitionned_by: status  # ex: country, status...
+            severity: high
+#
