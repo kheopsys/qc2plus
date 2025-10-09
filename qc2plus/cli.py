@@ -106,13 +106,13 @@ def test_connection(target: str, profiles_dir: str):
         success = conn_manager.test_connection()
         
         if success:
-            click.echo(f"✅ Connection to {target} successful!")
+            click.echo("✅ All database connections successful!")
         else:
-            click.echo(f"❌ Connection to {target} failed!")
+            click.echo("❌ Some database connections failed!")
             sys.exit(1)
             
     except Exception as e:
-        click.echo(f"❌ Error testing connection: {str(e)}", err=True)
+        click.echo(f"❌ Connection test failed: {str(e)}", err=True)
         sys.exit(1)
 
 

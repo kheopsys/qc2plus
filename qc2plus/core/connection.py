@@ -134,6 +134,7 @@ class ConnectionManager:
                 else:
                     result = conn.execute(text("SELECT 1"))
                 result.fetchone()
+            logging.info("✅ DATA source: OK")
             
             # Test quality database connection (if different)
             if self.data_engine != self.quality_engine:
@@ -143,6 +144,7 @@ class ConnectionManager:
                     else:
                         result = conn.execute(text("SELECT 1"))
                     result.fetchone()
+                logging.info("✅ QUALITY output: OK")
                     
             return True
                 
@@ -154,7 +156,6 @@ class ConnectionManager:
         """Create quality monitoring tables in the quality database"""
         
         schema = self.quality_config.get('schema', 'public')
-    
         create_schema_sql = f"CREATE SCHEMA IF NOT EXISTS {schema}"
         
         # Table 1: quality_test_results
@@ -218,7 +219,6 @@ class ConnectionManager:
             quality_anomalies_sql = self._adapt_sql_for_bigquery(quality_anomalies_sql)
         
         try:
-            
             with self.quality_engine.begin() as conn:
                 if self.quality_db_type != 'bigquery':
                     logging.info(f"Creating schema if not exists: {schema}")

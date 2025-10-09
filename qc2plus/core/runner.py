@@ -82,6 +82,7 @@ class QC2PlusRunner:
         # Run tests
         results = {
             'run_id': run_id,
+            'project_name': self.project.name,
             'status': 'success',
             'total_tests': 0,
             'passed_tests': 0,
@@ -345,6 +346,7 @@ class QC2PlusRunner:
         """Create empty result structure"""
         return {
             'run_id': run_id,
+            'project_name': self.project.name, 
             'status': 'success',
             'total_tests': 0,
             'passed_tests': 0,
