@@ -208,3 +208,4 @@ __marimo__/
 
 examples/zeflix-dev/*.json
 .DS_Store
+examples/*/qc2plus_project.yml
