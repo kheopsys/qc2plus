@@ -2,77 +2,9 @@
 2QC+ Level 2 Correlation Analysis
 ML-powered correlation anomaly detection
 """
-DB_LEVEL2_FUNCTIONS = {
-    'postgresql': {
-        'current_date': lambda: "CURRENT_DATE",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
-        'random_order': lambda: "ORDER BY RANDOM()",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-    'mysql': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
-        'date_trunc_day': lambda col: f"DATE({col})",
-        'date_trunc_week': lambda col: f"DATE_FORMAT({col}, '%Y-%u-1')",
-        'date_trunc_month': lambda col: f"DATE_FORMAT({col}, '%Y-%m-01')",
-        'cast_date': lambda col: f"DATE({col})",
-        'random_order': lambda: "ORDER BY RAND()",
-    },
-    'bigquery': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
-        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
-        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
-        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
-        'random_order': lambda: "ORDER BY RAND()",
-    },
-    'snowflake': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
-        'random_order': lambda: "ORDER BY RANDOM()",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-    'redshift': {
-        'current_date': lambda: "CURRENT_DATE",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
-        'random_order': lambda: "ORDER BY RANDOM()",
-    }
-}
-# Au tout début de temporal.py (après les imports)
 
-DB_LEVEL2_FUNCTIONS = {
-    'postgresql': {
-        'current_date': lambda: "CURRENT_DATE",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-    'bigquery': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
-        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
-        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
-        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-    'snowflake': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-}
+from qc2plus.sql.db_functions import DB_LEVEL2_FUNCTIONS
+
 import logging
 import numpy as np
 import pandas as pd
