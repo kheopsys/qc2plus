@@ -10,28 +10,25 @@ models:
 
     qc2plus_tests:
       level1:
-        # 🧱 1. Uniqueness test — IDs should be unique
         - unique:
-            column_name: customer_id
+            column_name: email
             severity: critical
             sample: null
 
-        # 🧩 2. Email format check — regex validation
         - email_format:
             column_name: email
             severity: high
 
-        # 🔢 3. Age validity — ensure realistic values
         - range_check:
             column_name: age
             min_value: 18
             max_value: 120
             severity: medium
 
-        # 🧾 4. Not null checks — key business columns
         - not_null:
-            column_name: email
+            column_name: first_name
             severity: critical
+
         - not_null:
             column_name: country
             severity: high
@@ -39,30 +36,25 @@ models:
             column_name: created_at
             severity: medium
 
-        # 📅 5. Future date detection — invalid timestamps
         - future_date:
             column_name: created_at
             severity: medium
 
-        # 🕓 6. Freshness check — ensure recent data
         - freshness:
             column_name: created_at
             max_age_days: 30
             severity: high
 
-        # 🎯 7. Accepted values — for status field
         - accepted_values:
             column_name: status
             accepted_values: ['active', 'inactive']
             severity: critical
 
-        # 🌍 8. Accepted values — for country field (sample domain)
         - accepted_values:
             column_name: country
             accepted_values: ['USA', 'UK', 'Canada']
             severity: medium
 
-        # ⚖️ 9. Statistical threshold — number of new customers per day
         - statistical_threshold:
             metric: count
             threshold_type: relative
@@ -70,21 +62,9 @@ models:
             window_days: 30
             severity: medium
 
-        # 💰 10. Custom SQL — too many inactive users (>10%)
-        - custom_sql:
-            custom_sql: |
-              SELECT 
-                'inactive_ratio_limit' AS column_name,
-                COUNT(*) AS failed_rows,
-                (SELECT COUNT(*) FROM demo.customers) AS total_rows,
-                'Inactive users exceed 10%' AS message
-              FROM demo.customers
-              WHERE status = 'inactive'
-              HAVING COUNT(*) > 0.1 * (SELECT COUNT(*) FROM demo.customers)
-            severity: high
+
 
       level2:
-        # 📊 1. Distribution analysis — evolution by country and status
         - distribution_analysis:
             segments: [country, status]
             metrics: [count]

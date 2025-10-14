@@ -11,35 +11,29 @@ models:
 
     qc2plus_tests:
       level1:
-        # 🆔 1. Unicité de session_id
         - unique:
             column_name: session_id
             severity: critical
 
-        # 👤 2. user_id obligatoire
         - not_null:
             column_name: user_id
             severity: critical
 
-        # 📅 3. Dates futures interdites
         - future_date:
             column_name: session_date
             severity: high
 
-        # 📊 4. Nombre de pages vues valide
         - range_check:
             column_name: page_views
             min_value: 1
             max_value: 200
             severity: medium
 
-        # ⏳ 5. Données fraîches
         - freshness:
             column_name: session_date
             max_age_days: 3
             severity: critical
 
-        # 🧩 6. Custom SQL : détecter les sessions "anormales" (> 80 pages vues)
         - custom_sql:
             custom_sql: |
               SELECT 
@@ -50,10 +44,9 @@ models:
               FROM demo.user_sessions
               WHERE page_views > 80
               HAVING COUNT(*) > 0
-            severity: medium
+
 
       level2:
-        # 📈 1. Analyse temporelle (tendances et anomalies)
         - temporal_analysis:
             date_column: session_date
             metrics: [count, sum_page_views]
@@ -63,7 +56,6 @@ models:
             frequency: daily
             severity: medium
 
-        # 📊 2. Analyse de distribution : concentration d’activité par utilisateur
         - distribution_analysis:
             segments: [user_id]
             metrics: [count, sum_page_views]
@@ -73,7 +65,6 @@ models:
             behavior_change_threshold: 100
             severity: medium
 
-        # 🧮 3. Corrélation entre nombre de pages vues et activité journalière
         - correlation_analysis:
             variables: [page_views, session_date]
             expected_correlation: 0.0

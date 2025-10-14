@@ -2,19 +2,16 @@ models:
   - name: customer_datamart
     description: "Data quality checks on the 90-day customer performance mart"
     
-    # Pas de sampling temporel car pas de colonne de date
     sample:
       method: random
       percentage: 0.2
 
     qc2plus_tests:
       level1:
-        # ✅ 1. Uniqueness sur customer_id
         - unique:
             column_name: customer_id
             severity: critical
 
-        # ✅ 2. Not null sur les indicateurs essentiels
         - not_null:
             column_name: lifetime_value
             severity: critical
@@ -25,26 +22,22 @@ models:
             column_name: customer_segment
             severity: critical
 
-        # ✅ 3. Range check : lifetime_value logique
         - range_check:
             column_name: lifetime_value
             min_value: 0
             max_value: 1000000
             severity: medium
 
-        # ✅ 4. Range check : order_frequency doit être >= 1
         - range_check:
             column_name: order_frequency
             min_value: 1
             severity: medium
 
-        # ✅ 5. Accepted values pour le segment
         - accepted_values:
             column_name: customer_segment
             accepted_values: ['Mono-buyer', 'Regular-buyer', 'VIP-buyer', 'Not-segmented']
             severity: critical
 
-        # ✅ 6. Benchmark sur la distribution des segments
         - accepted_benchmark_values:
             column_name: customer_segment
             benchmark_values:
@@ -54,35 +47,20 @@ models:
             threshold: 0.2
             severity: medium
 
-        # ✅ 7. Range check optionnel sur lifetime_value extrêmes
         - range_check:
             column_name: lifetime_value
             max_value: 500000
             severity: low
 
-        # ✅ 8. Custom SQL : trop de VIP
-        - custom_sql:
-            custom_sql: |
-              SELECT 
-                'vip_ratio_limit' AS column_name,
-                COUNT(*) AS failed_rows,
-                (SELECT COUNT(*) FROM demo.customer_datamart) AS total_rows,
-                'Too many VIP customers (>20%)' AS message
-              FROM demo.customer_datamart
-              WHERE customer_segment = 'VIP-buyer'
-              HAVING COUNT(*) > 0.2 * (SELECT COUNT(*) FROM demo.customer_datamart)
-            severity: critical
 
 
       level2:
-        # ✅ 1. Corrélation entre lifetime_value et order_frequency
         - correlation_analysis:
-            variables: [lifetime_value, order_frequency]
-            expected_correlation: 0.7
-            threshold: 0.2
-            severity: medium
+            variables: [lifetime_value, customer_id]
+            expected_correlation: 0.99
+            threshold: 0.01
 
-        # ✅ 2. Distribution par pays (anomalies géographiques)
+        # ✅ 2. Distribution  per country
         - distribution_analysis:
             segments: [country]
             metrics: [count, avg_lifetime_value]

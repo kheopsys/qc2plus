@@ -61,14 +61,20 @@ SQL_MACROS = {
         HAVING (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }} WHERE {{ column_name }} IS NULL) > 0
     """,
 
+
     'email_format': """
         -- Test: Email format validation on {{ column_name }}
         
         {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
+        -- {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$' %}
 
-        {# 🔹 Doubler les backslashes pour BigQuery et éviter le préfixe r'' #}
-        {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\\\\\\.[A-Za-z]{2,}$' %}
 
+        
+        {% if db_type == 'bigquery' %}
+           {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\\\\\\.[A-Za-z]{2,}$' %}
+         {% else %}
+         {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' %}
+         {% endif %}
 
         WITH invalid_emails AS (
             SELECT {{ column_name }}
@@ -321,7 +327,11 @@ SQL_MACROS = {
             SELECT 
                 {{ column_name }},
                 COUNT(*) AS actual_count,
-                COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() AS actual_percentage
+                {% if db_type == 'bigquery' %}
+                    CAST(COUNT(*) AS FLOAT64) * 100.0 / CAST(SUM(COUNT(*)) OVER() AS FLOAT64) AS actual_percentage
+                {% else %}
+                    COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() AS actual_percentage
+                {% endif %}
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
@@ -330,22 +340,48 @@ SQL_MACROS = {
             SELECT 
                 a.{{ column_name }},
                 a.actual_percentage,
-                CASE 
-                    {% for value, expected_pct in benchmark_values.items() %}
-                    WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
-                    {% endfor %}
-                    ELSE 0
-                END AS expected_percentage,
-                ABS(
-                    a.actual_percentage - 
+                {% if db_type == 'bigquery' %}
+                    CAST(CASE 
+                        {% for value, expected_pct in benchmark_values.items() %}
+                        WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                        {% endfor %}
+                        ELSE 0
+                    END AS FLOAT64) AS expected_percentage,
+                {% else %}
                     CASE 
                         {% for value, expected_pct in benchmark_values.items() %}
                         WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
                         {% endfor %}
                         ELSE 0
-                    END
+                    END AS expected_percentage,
+                {% endif %}
+                ABS(
+                    {% if db_type == 'bigquery' %}
+                        CAST(COALESCE(a.actual_percentage, 0) AS FLOAT64)
+                        - CAST(COALESCE(
+                            CASE 
+                                {% for value, expected_pct in benchmark_values.items() %}
+                                WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                                {% endfor %}
+                                ELSE 0
+                            END, 0) AS FLOAT64)
+                    {% else %}
+                        COALESCE(a.actual_percentage, 0) 
+                        - COALESCE(
+                            CASE 
+                                {% for value, expected_pct in benchmark_values.items() %}
+                                WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                                {% endfor %}
+                                ELSE 0
+                            END, 0)
+                    {% endif %}
                 ) AS percentage_diff
             FROM actual_distribution a
+        ),
+        violation_count AS (
+            SELECT COUNT(*) as total_violations
+            FROM benchmark_comparison 
+            WHERE percentage_diff > {{ threshold }} * 100
         ),
         violations AS (
             SELECT 
@@ -356,8 +392,13 @@ SQL_MACROS = {
                 CONCAT(
                     {{ db_functions.cast_text(column_name) }},
                     ' (',
-                    ROUND(actual_percentage, 1), '% vs ',
-                    expected_percentage, '% expected)'
+                    {% if db_type == 'bigquery' %}
+                        CAST(ROUND(actual_percentage, 1) AS STRING), '% vs ',
+                        CAST(expected_percentage AS STRING), '% expected)'
+                    {% else %}
+                        CAST(ROUND(actual_percentage, 1) AS VARCHAR), '% vs ',
+                        CAST(expected_percentage AS VARCHAR), '% expected)'
+                    {% endif %}
                 ) AS violation_detail
             FROM benchmark_comparison
             WHERE percentage_diff > {{ threshold }} * 100
@@ -365,12 +406,13 @@ SQL_MACROS = {
         )
         SELECT 
             '{{ column_name }}' AS column_name,
-            (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) AS failed_rows,
+            (SELECT total_violations FROM violation_count) AS failed_rows,
             (SELECT COUNT(DISTINCT {{ column_name }}) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Benchmark violations found in distribution' AS message,
             CONCAT('Invalid distributions: ', {{ db_functions.string_agg('violation_detail') }}) AS invalid_examples
         FROM violations
-        HAVING (SELECT COUNT(*) FROM benchmark_comparison WHERE percentage_diff > {{ threshold }} * 100) > 0
+        CROSS JOIN violation_count
+        WHERE violation_count.total_violations > 0
     """,
 
     'statistical_threshold': """

@@ -21,11 +21,16 @@ INSERT INTO demo.customers (email, first_name, last_name, age, status, country, 
 ('ycharlie.wilson@email.com', 'yCharlie', 'yWilson', 49, 'active', 'UK', CURRENT_DATE - INTERVAL '8 days'),
 ('zcharlie.wilson@email.com', 'ZCharlie', 'ZWilson', 38, 'active', 'UK', CURRENT_DATE - INTERVAL '2 days');
 
--- Problematic customers data for testing
+-- Problematic customers data for testing for postgres
 INSERT INTO demo.customers (email, first_name, last_name, age, status, country, created_at) VALUES
 ('invalid-email', 'Test', 'User1', 25, 'active', 'USA', CURRENT_DATE - INTERVAL '17 days'),  -- Invalid email
 ('test2@email.com', 'Test', 'User2', 150, 'active', 'USA', CURRENT_DATE - INTERVAL '25 days'); -- Invalid age
-
+-- BigQuery
+INSERT INTO `demo.customers` (email, first_name, last_name, age, status, country, created_at)
+VALUES
+  ('invalid-email', 'Test', 'User1', 25, 'active', 'USA', TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 17 DAY)),  -- Invalid email
+  ('test2@email.com', 'Test', 'User2', 150, 'active', 'USA', TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 25 DAY)), -- Invalid age
+  (NULL, 'Test', 'User7', 150, 'active', 'USA', TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 25 DAY)); -- Invalid email + age
 
 
 -- Orders with normal pattern (baseline)
