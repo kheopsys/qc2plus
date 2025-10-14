@@ -10,26 +10,16 @@ models:
 
     qc2plus_tests:
       level1:
-<<<<<<< Updated upstream
-        # 🔹 1. Identifiants uniques
-=======
-
->>>>>>> Stashed changes
         - unique:
             column_name: order_id
             severity: critical
 
-<<<<<<< Updated upstream
-        # 🔹 2. Références clients valides
         - relationship:
             column_name: customer_id
             reference_table: customers
             reference_column: customer_id
             severity: critical
 
-        # 🔹 3. Valeurs obligatoires
-=======
->>>>>>> Stashed changes
         - not_null:
             column_name: customer_id
             severity: critical
@@ -39,49 +29,29 @@ models:
         - not_null:
             column_name: total_amount
             severity: critical
-
-<<<<<<< Updated upstream
-        # 🔹 4. Valeurs futures interdites
-=======
-
-        - relationship:
-            column_name: customer_id
-            reference_table: customers
-            reference_column: customer_id
-            severity: critical
-
-            
->>>>>>> Stashed changes
         - future_date:
             column_name: order_date
             severity: high
-
-        # 🔹 5. Fraîcheur des données (ingestion)
         - freshness:
             column_name: created_at
-            max_age_days: 3
+            max_age_days: 0 # change to 0 day for stricter check
             severity: high
 
-        # 🔹 6. Valeurs acceptées pour le statut
         - accepted_values:
             column_name: status
             accepted_values: ['pending', 'completed', 'cancelled']
             severity: medium
-
-        # 🔹 7. Vérification du montant positif
         - range_check:
             column_name: total_amount
             min_value: 0
             max_value: 10000
             severity: medium
 
-        # 🔹 8. Vérification de cohérence temporelle (pas trop ancienne)
         - range_check:
             column_name: order_date
             min_value: '2020-01-01'
             severity: low
 
-        # 🔹 9. Seuil statistique sur le volume de commandes
         - statistical_threshold:
             metric: count
             threshold_type: relative
