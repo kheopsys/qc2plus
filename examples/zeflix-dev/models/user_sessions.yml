@@ -8,7 +8,7 @@ models:
       partitioned_by: session_date
       partition_strategy: latest
       partition_count: 2
-
+  
     qc2plus_tests:
       level1:
         - unique:
@@ -34,7 +34,7 @@ models:
             max_age_days: 3
             severity: critical
 
-        - custom_sql:
+        - custom_sql: 
             custom_sql: |
               SELECT 
                 'page_views_outlier' AS column_name,

@@ -235,7 +235,6 @@ class PersistenceManager:
     
     def _batch_insert_anomalies(self, anomaly_records: List[Dict[str, Any]]) -> None:
         """Batch insert anomaly records"""
-        
         if not anomaly_records:
             return
         
@@ -249,6 +248,7 @@ class PersistenceManager:
             ({columns_str}) 
             VALUES ({placeholders})
         """
+
         
         # Execute individual inserts (fix the list issue)
         for record in anomaly_records:
@@ -325,43 +325,46 @@ class PersistenceManager:
                                       analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
         """Extract distribution-specific anomalies"""
         
-        anomalies = []
+        anomaly_records = []
         
         # Extract from individual segment analyses
-        individual_analyses = details.get('individual_analyses', {})
-        
-        for segment, segment_results in individual_analyses.items():
-            for anomaly in segment_results.get('anomalies', []):
-                anomalies.append({
-                    'anomaly_id': str(uuid.uuid4()),
-                    'model_name': model_name,
-                    'analyzer_type': analyzer_name,
-                    'anomaly_type': 'distribution_change',
-                    'anomaly_score': 1 - anomaly.get('p_value', 0.5),
-                    'affected_columns': f"{segment}:{anomaly.get('metric', '')}",
-                    'anomaly_details': json.dumps(anomaly),
-                    'detection_time': datetime.now(),
-                    'severity': anomaly.get('severity', 'medium'),
-                    'target_environment': target_environment
-                })
-        
-        # Extract cross-segment anomalies
-        cross_segment = details.get('cross_segment_analysis', {})
-        for anomaly in cross_segment.get('anomalies', []):
-            anomalies.append({
+        anomalies = details.get('anomalies', [])
+        for anomaly in anomalies:
+            # Determine anomaly score based on type
+            if anomaly.get('type') == 'segment_share_shift':
+                # For share shifts, use absolute share change
+                anomaly_score = abs(float(anomaly.get('share_change', 0)))
+            elif anomaly.get('type') == 'segment_behavior_anomaly':
+                # For behavior anomalies, use absolute percent change
+                anomaly_score = abs(float(anomaly.get('percent_change', 0)))
+            else:
+                anomaly_score = 1.0
+            segment = anomaly.get('segment', 'unknown_segment')
+            segment_value = anomaly.get('segment_value', 'unknown_value')
+            metric = anomaly.get('metric', 'unknown_metric')
+            affected_columns = f"{segment}:{segment_value}:{metric}"
+            anomaly_details = {
+                'type': anomaly.get('type'),
+                'segment': segment,
+                'segment_value': segment_value,
+                'metric': metric,
+                'description': anomaly.get('description', '')
+            }
+ 
+            anomaly_records.append({
                 'anomaly_id': str(uuid.uuid4()),
                 'model_name': model_name,
                 'analyzer_type': analyzer_name,
-                'anomaly_type': anomaly.get('type', 'cross_segment'),
-                'anomaly_score': anomaly.get('concentration_change', 1.0),
-                'affected_columns': f"{anomaly.get('segment', '')}:{anomaly.get('segment_value', '')}",
-                'anomaly_details': json.dumps(anomaly),
+                'anomaly_type': anomaly.get('type', 'distribution_anomaly'),
+                'anomaly_score': float(anomaly_score),
+                'affected_columns': affected_columns,
+                'anomaly_details':  json.dumps(anomaly_details, default=str),
                 'detection_time': datetime.now(),
                 'severity': anomaly.get('severity', 'medium'),
                 'target_environment': target_environment
             })
-        
-        return anomalies
+
+        return anomaly_records
     
     def get_quality_history(self, model_name: Optional[str] = None, 
                           days: int = 30) -> Dict[str, Any]:

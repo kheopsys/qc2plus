@@ -2,12 +2,6 @@ models:
   - name: customers
     description: "Comprehensive data quality plan for the customers model"
     
-    sample:
-      method: random
-      percentage: 0.2
-      partitioned_by: created_at
-      partition_strategy: latest
-
     qc2plus_tests:
       level1:
         - unique:
@@ -64,7 +58,6 @@ models:
             window_days: 30
             severity: medium
 
-        # 💰 10. Custom SQL — too many inactive users (>10%)
         - custom_sql:
             custom_sql: |
               SELECT 
@@ -78,7 +71,7 @@ models:
             severity: high
 
       level2:
-        - distribution_analysis:
+        distribution_analysis:
             segments: [country, status]
             metrics: [count]
             date_column: created_at
@@ -86,8 +79,7 @@ models:
             comparison_period: 7
             behavior_change_threshold: 80
             severity: medium
-
-        - temporal_analysis:
+        temporal_analysis:
             date_column: created_at
             metrics: [count]
             seasonality_check: true
@@ -96,7 +88,7 @@ models:
             frequency: daily
             severity: medium
 
-        - correlation_analysis:
+        correlation_analysis:
             variables: [age, created_at]
             expected_correlation: 0.0
             threshold: 0.4

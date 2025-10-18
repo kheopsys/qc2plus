@@ -1,7 +1,6 @@
 models:
   - name: user_sessions
     description: "Full coverage for session integrity, freshness and behavioral analytics"
-
     sample:
       method: random
       size: 3
@@ -34,7 +33,9 @@ models:
             max_age_days: 3
             severity: critical
 
-        - custom_sql: |
+
+        - custom_sql: 
+            custom_sql: |
               SELECT 
                 'page_views_outlier' AS column_name,
                 COUNT(*) AS failed_rows,
@@ -43,10 +44,8 @@ models:
               FROM demo.user_sessions
               WHERE page_views > 80
               HAVING COUNT(*) > 0
-          severity: medium
-
       level2:
-        - temporal_analysis:
+        temporal_analysis:
             date_column: session_date
             metrics: [count, sum_page_views]
             anomaly_detection: true
@@ -54,8 +53,7 @@ models:
             window_days: 7
             frequency: daily
             severity: medium
-
-        - distribution_analysis:
+        distribution_analysis:
             segments: [user_id]
             metrics: [count, sum_page_views]
             date_column: session_date
@@ -65,7 +63,7 @@ models:
             severity: medium
 
 
-        - correlation_analysis:
+        correlation_analysis:
             variables: [page_views, session_date]
             expected_correlation: 0.0
             threshold: 0.5

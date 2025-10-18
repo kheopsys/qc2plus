@@ -88,30 +88,16 @@ models:
         #     severity: critical
 
       level2:
-        # 📈 1. Corrélation entre total_amount et client_id (proxy d’activité)
-        - correlation_analysis:
-            variables: [total_amount, customer_id]
-            expected_correlation: 0.0
-            threshold: 0.3
-            window_days: 30
-            date_column: order_date
-            severity: low
 
-        - correlation_analysis:
-            variables: [total_amount, customer_id]
-            expected_correlation: None
-            threshold: 0.3
-            window_days: 20
-            date_column: created_at
-          
-        - temporal_analysis:
-            date_column: order_date
-            metrics: [count, sum_total_amount]
-            seasonality_check: true
-            window_days: 10   
-            frequency: monthly 
-#
-        - distribution_analysis:
+
+        #temporal_analysis:
+        #    date_column: order_date
+        #    metrics: [count, sum_total_amount]
+        #    seasonality_check: true
+        #    window_days: 10   
+        #    frequency: monthly 
+
+        distribution_analysis:
             segments: [status]
             #segments_source: customers.country on customers.id
             metrics: [count, sum_total_amount]

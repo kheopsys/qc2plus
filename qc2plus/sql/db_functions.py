@@ -15,6 +15,13 @@ DB_FUNCTIONS = {
         "regex_not_match": lambda col, pattern: f"NOT ({col} ~ '{pattern}')",
         "date_sub": lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
         "date_cast": lambda col: f"CAST({col} AS DATE)",
+        "float_cast": lambda col: f"CAST({col} AS FLOAT)",
+        "format_percentage_diff": lambda actual, expected: (
+            f"CAST(ROUND(CAST({actual} AS NUMERIC), 1) AS VARCHAR), '% vs ', CAST({expected} AS VARCHAR), '% expected)'"
+        ),
+        "email_regex": lambda: r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
+
+
     },
 
     "bigquery": {
@@ -28,6 +35,12 @@ DB_FUNCTIONS = {
         "regex_not_match": lambda col, pattern: f"NOT REGEXP_CONTAINS({col}, '{pattern}')",
         "date_sub": lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
         "date_cast": lambda col: f"DATE({col})",
+        "float_cast": lambda col: f"CAST({col} AS FLOAT64)" , 
+        "format_percentage_diff": lambda actual, expected: (
+            f"CAST(ROUND({actual}, 1) AS STRING), '% vs ', CAST({expected} AS STRING), '% expected)'"
+        ),
+        "email_regex": lambda: r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$',
+
     },
 
     "snowflake": {
@@ -56,3 +69,40 @@ DB_FUNCTIONS = {
         "date_cast": lambda col: f"CAST({col} AS DATE)",
     },
 }
+
+DB_LEVEL2_FUNCTIONS = {
+    'postgresql': {
+        'current_date': lambda: "CURRENT_DATE",
+        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+        "float_cast": lambda col: f"CAST({col} AS FLOAT)",
+        "format_percentage_diff": lambda actual, expected: (
+        f"CAST(ROUND({actual}, 1) AS VARCHAR), '% vs ', CAST({expected} AS VARCHAR), '% expected)'"
+    ),
+
+
+
+    },
+    'bigquery': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
+        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
+        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
+        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+        "float_cast": lambda col: f"CAST({col} AS FLOAT64)"  # BigQuery
+
+    },
+    'snowflake': {
+        'current_date': lambda: "CURRENT_DATE()",
+        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
+        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
+        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
+        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
+        'cast_date': lambda col: f"CAST({col} AS DATE)",
+    },
+}
+
