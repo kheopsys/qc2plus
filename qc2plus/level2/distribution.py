@@ -9,33 +9,9 @@ import pandas as pd
 from typing import Dict, List, Any, Optional
 
 from qc2plus.core.connection import ConnectionManager
-DB_LEVEL2_FUNCTIONS = {
-    'postgresql': {
-        'current_date': lambda: "CURRENT_DATE",
-        'date_sub': lambda date_col, days: f"{date_col} - INTERVAL '{days} days'",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('day', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('week', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('month', {col})",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-    'bigquery': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATE_SUB({date_col}, INTERVAL {days} DAY)",
-        'date_trunc_day': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), DAY)",
-        'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
-        'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
 
-    'snowflake': {
-        'current_date': lambda: "CURRENT_DATE()",
-        'date_sub': lambda date_col, days: f"DATEADD(day, -{days}, {date_col})",
-        'date_trunc_day': lambda col: f"DATE_TRUNC('DAY', {col})",
-        'date_trunc_week': lambda col: f"DATE_TRUNC('WEEK', {col})",
-        'date_trunc_month': lambda col: f"DATE_TRUNC('MONTH', {col})",
-        'cast_date': lambda col: f"CAST({col} AS DATE)",
-    },
-}
+from qc2plus.sql.db_functions import DB_LEVEL2_FUNCTIONS
+
 class DistributionAnalyzer:
     """Analyzes data distributions - Focus on segment shifts and behavior anomalies"""
     
