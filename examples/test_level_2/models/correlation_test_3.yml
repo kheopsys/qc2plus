@@ -1,0 +1,12 @@
+models:
+  - name: correlation_test_3
+    description: "Test de corrélation anormalement forte non attendue entre impressions et clicks"
+
+    qc2plus_tests:
+      level2:
+        correlation_analysis:
+            variables: ["impressions", "clicks"]
+            expected_correlation: 0.0  
+            threshold: 0.2         
+            correlation_type: "pearson"
+            severity: critical
