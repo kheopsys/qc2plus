@@ -28,17 +28,30 @@ class DistributionAnalyzer:
             reference_period = config.get('reference_period', 30)
             comparison_period = config.get('comparison_period', 7)
             date_column = config.get('date_column', None)
+            min_data_threshold = config.get('min_data_threshold', 10)
             if date_column is None:
                 logging.info(f"No date_column specified for {model_name}, skipping distribution analysis")
                 return {
-                'passed': True,
-                'anomalies_count': 0,
+                'passed': False,
+                'anomalies_count': 1,
                 'message': 'Distribution analysis skipped (no date column specified)',
                 'details': {
                     'skipped': True,
-                    'reason': 'No date_column configured'
+                    'reason': 'No date_column configured',
+                    'anomalies': [{
+                        'type': 'missing_date_column',
+                        'segment': 'N/A',
+                        'segment_value': 'N/A',
+                        'metric': 'configuration',
+                        'reference_avg': 0,
+                        'comparison_avg': 0,
+                        'percent_change': 0,
+                        'severity': 'critical',
+                        'description': 'No date column configured for distribution analysis - cannot compare time periods without a date column'
+                    }]
+                    
                     }
-                }
+                }   
             
             # Validate configuration
             if not segments:
@@ -55,19 +68,67 @@ class DistributionAnalyzer:
             
             if reference_data.empty or comparison_data.empty:
                 return {
-                    'passed': True,
-                    'anomalies_count': 0,
+                    'passed': False,
+                    'anomalies_count': 1,
                     'message': 'Insufficient data for distribution analysis',
-                    'details': {}
+                    'details': {
+                        'reason': 'No data in one or both periods',
+                        'reference_rows': len(reference_data),
+                        'comparison_rows': len(comparison_data),
+                        'severity': 'critical',
+                        'anomalies': [{
+                            'type': 'insufficient_data',
+                            'segment': 'N/A',
+                            'segment_value': 'N/A',
+                            'metric': 'data_availability',
+                            'reference_avg': len(reference_data),
+                            'comparison_avg': len(comparison_data),
+                            'percent_change': 0,
+                            'severity': 'critical',
+                            'description': f'No data available in one or both periods (reference: {len(reference_data)} rows, comparison: {len(comparison_data)} rows)'
+                        }]
+                    }
                 }
-            
+            if min_data_threshold > 0:
+                reference_total = self._count_rows(
+                    model_name, segments, date_column, reference_period, comparison_period, 'reference'
+                )
+                comparison_total = self._count_rows(
+                    model_name, segments, date_column, comparison_period, comparison_period, 'comparison'
+                )
+                
+                if reference_total < min_data_threshold or comparison_total < min_data_threshold:
+                    logging.error(f"Insufficient data for {model_name}: ref={reference_total}, comp={comparison_total}, threshold={min_data_threshold}")
+                    return {
+                        'passed': False,
+                        'anomalies_count': 1,
+                        'message': f'Insufficient data - only {reference_total} reference rows and {comparison_total} comparison rows (minimum {min_data_threshold} required)',
+                        'details': {
+                            'reason': f'Not enough data (minimum {min_data_threshold} rows required per period)',
+                            'reference_rows': reference_total,
+                            'comparison_rows': comparison_total,
+                            'min_threshold': min_data_threshold,
+                            'severity': 'critical',
+                            'anomalies': [{
+                                'type': 'insufficient_data',
+                                'segment': 'N/A',
+                                'segment_value': 'N/A',
+                                'metric': 'data_volume',
+                                'reference_avg': reference_total,
+                                'comparison_avg': comparison_total,
+                                'percent_change': 0,
+                                'severity': 'critical',
+                                'description': f'Insufficient data volume: {reference_total} reference rows, {comparison_total} comparison rows (minimum {min_data_threshold} required per period)'
+                            }]
+                        }
+                    }
             # Perform ONLY the 2 key analyses
             anomalies = self._detect_segment_anomalies(reference_data, comparison_data, segments, metrics)
 
             if anomalies:
                 logging.info(f"Distribution anomalies detected for {model_name}: {anomalies}")
                         
-            return {
+            results =  {
                 'passed': len(anomalies) == 0,
                 'anomalies_count': len(anomalies),
                 'message': self._generate_summary_message(anomalies),
@@ -79,6 +140,9 @@ class DistributionAnalyzer:
                     'anomalies': anomalies
                 }
             }
+
+
+            return results
             
         except Exception as e:
             logging.error(f"Distribution analysis failed for {model_name}: {str(e)}")
@@ -117,7 +181,7 @@ class DistributionAnalyzer:
                 # Assume it's a column name for sum
                 metric_clauses.append(f'SUM({metric}) as {metric}')
         
-
+        
         current_date_expr = funcs['current_date']()
         cast_date_col = funcs['cast_date'](date_column)
                                            
@@ -129,7 +193,7 @@ class DistributionAnalyzer:
                 {cast_date_col} >= {funcs['date_sub'](current_date_expr, total_days)} 
                 AND {cast_date_col} < {funcs['date_sub'](current_date_expr, comparison_period)}
             """
-        
+
         query = f"""
             SELECT 
                 {', '.join(segments)},
@@ -205,7 +269,7 @@ class DistributionAnalyzer:
                         'reference_share': round(ref_share, 1),
                         'comparison_share': round(comp_share, 1), 
                         'share_change': round(share_change, 1),
-                        'severity': 'high' if abs(share_change) > 20 else 'medium',
+                        'severity': 'critical' if abs(share_change) > 20 else 'high',
                         'description': f'{segment_value} share changed from {ref_share:.1f}% to {comp_share:.1f}% ({share_change:+.1f} points)'
                     })
         
@@ -224,12 +288,14 @@ class DistributionAnalyzer:
             # Get average metric per segment for both periods
             ref_segment_avg = reference_data.groupby(segment)[metric].mean()
             comp_segment_avg = comparison_data.groupby(segment)[metric].mean()
+
             
             # Check all segments
             all_segments = set(ref_segment_avg.index) | set(comp_segment_avg.index)
             
             for segment_value in all_segments:
                 ref_avg = ref_segment_avg.get(segment_value, 0)
+                
                 comp_avg = comp_segment_avg.get(segment_value, 0)
                 
                 if ref_avg > 0:  # Avoid division by zero
@@ -297,3 +363,42 @@ class DistributionAnalyzer:
             
         except Exception as e:
             return {'error': f'Failed to get segment summary: {str(e)}'}
+        
+    def _count_rows(self, model_name: str, segments: List[str], date_column: str, 
+                reference_period: int, comparison_period: int, period_type: str) -> int:
+    
+            
+        schema = self.connection_manager.config.get('schema', 'public')
+        db_type = self.connection_manager.db_type
+
+        if db_type in DB_LEVEL2_FUNCTIONS:
+            funcs = DB_LEVEL2_FUNCTIONS[db_type]
+        else:
+            funcs = DB_LEVEL2_FUNCTIONS['postgresql']
+
+        current_date_expr = funcs['current_date']()
+        cast_date_col = funcs['cast_date'](date_column)
+                                        
+        if period_type == 'comparison':
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr, reference_period)}"
+        else:  # reference
+            total_days = comparison_period + reference_period
+            date_condition = f"""
+                {cast_date_col} >= {funcs['date_sub'](current_date_expr, total_days)} 
+                AND {cast_date_col} < {funcs['date_sub'](current_date_expr, comparison_period)}
+            """
+        
+        # Query simple COUNT(*)
+        count_query = f"""
+            SELECT COUNT(*) as total_rows
+            FROM {schema}.{model_name}
+            WHERE {date_condition}
+            AND {' AND '.join([f'{segment} IS NOT NULL' for segment in segments])}
+        """
+        
+        try:
+            count_result = self.connection_manager.execute_query(count_query)
+            return int(count_result.iloc[0]['total_rows']) if not count_result.empty else 0
+        except Exception as e:
+            logging.warning(f"Failed to count rows for {model_name}: {str(e)}")
+            return 0

@@ -45,23 +45,29 @@ models:
               'Regular-buyer': 40
               'VIP-buyer': 10
             threshold: 0.2
-            severity: medium
+            severity: critical
 
         - range_check:
             column_name: lifetime_value
             max_value: 500000
             severity: low
-
+        - custom_sql:
+            severity: high
+            custom_sql: |
+              -- Vérifie qu'il n'y a pas plus de 10 clients VIP -- VALABLE SUR POSTGRESQL 
+              SELECT
+                'VIP_limit' AS column_name,
+                CASE WHEN COUNT(*) > 10 THEN 1 ELSE 0 END AS failed_rows,
+                COUNT(*) AS total_rows,
+                'Too many VIP buyers (>10)' AS message,
+                STRING_AGG(CAST(customer_id AS TEXT), ', ') AS invalid_examples
+              FROM demo.customer_datamart
+              WHERE customer_segment = 'VIP-buyer'
+              HAVING COUNT(*) > 10
 
 
       level2:
-        - correlation_analysis:
-            variables: [lifetime_value, customer_id]
-            expected_correlation: 0.99
-            threshold: 0.01
-
-        # ✅ 2. Distribution  per country
-        - distribution_analysis:
+        distribution_analysis:
             segments: [country]
             metrics: [count, avg_lifetime_value]
             reference_period: 90

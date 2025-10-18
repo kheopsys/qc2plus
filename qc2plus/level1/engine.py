@@ -26,6 +26,7 @@ class Level1Engine:
             self.jinja_env.globals[macro_name] = self._create_macro_function(macro_template)
         
         from qc2plus.level1.utils import build_sample_clause
+    
         self.jinja_env.globals['build_sample_clause'] = build_sample_clause
     
     def _create_macro_function(self, template_str: str):
@@ -65,7 +66,6 @@ class Level1Engine:
         
         # Generate SQL for the test
         sql = self.compile_test(test_type, test_params, model_name, sample_config=sample_config)
-        
         # Prepare base result with new fields
         base_result = {
             'query': sql,  # New field for the executed SQL query
@@ -145,13 +145,13 @@ class Level1Engine:
             'sample_config': sample_config,
             'db_functions': db_functions,
             'db_type': db_type,
+        
             **test_params
         }
 
         # Rendu du SQL
         template = self.jinja_env.from_string(SQL_MACROS[test_type])
         sql = template.render(**context)
-
         return sql
 
     def get_available_tests(self) -> List[str]:

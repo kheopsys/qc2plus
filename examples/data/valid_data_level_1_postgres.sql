@@ -1,7 +1,7 @@
 -- ============================================
 -- POSTGRESQL - DONNÉES VALIDES (REFACTORISÉ)
 -- ============================================
-CREATE TABLE demo.customer_datamart (
+CREATE TABLE IF NOT EXISTS demo.customer_datamart (
     customer_id       INT PRIMARY KEY,
     country            VARCHAR(100),
     lifetime_value     NUMERIC(12, 2),
@@ -15,15 +15,20 @@ TRUNCATE TABLE demo.orders RESTART IDENTITY CASCADE;
 TRUNCATE TABLE demo.user_sessions RESTART IDENTITY CASCADE;
 TRUNCATE TABLE demo.customer_datamart RESTART IDENTITY CASCADE;
 
+
+
+
 -- ============================================
 -- 1. TABLE CUSTOMERS
 -- ============================================
 
 -- 1.1 UNIQUE TEST - Pas de doublons
 INSERT INTO demo.customers (customer_id, email, first_name, last_name, age, status, country, created_at) VALUES
-(100, 'unique1@email.com', 'Valid', 'User1', 25, 'active', 'USA', NOW() - INTERVAL '10 days'),
-(101, 'unique2@email.com', 'Valid', 'User2', 30, 'active', 'UK', NOW() - INTERVAL '9 days'),
-(102, 'unique3@email.com', 'Valid', 'User3', 35, 'active', 'Canada', NOW() - INTERVAL '8 days');
+(100, 'unique1@email.com', 'Valid1', 'User1', 25, 'active', 'USA', NOW() - INTERVAL '10 days'),
+(101, 'unique2@email.com', 'Valid2', 'User2', 30, 'active', 'UK', NOW() - INTERVAL '9 days'),
+(102, 'unique3@email.com', 'Valid3', 'User3', 35, 'active', 'Canada', NOW() - INTERVAL '8 days');
+(103, 'unique4@email.com', 'valid4', 'User4', 25, 'active', 'USA', NOW() - INTERVAL '1 day'),
+
 
 -- 1.2 NOT_NULL TEST
 INSERT INTO demo.customers VALUES
@@ -74,19 +79,6 @@ INSERT INTO demo.orders VALUES
 (15001, 501, CURRENT_DATE - INTERVAL '2 day', 200.00, 'completed', NOW() - INTERVAL '1 day'),
 (15002, 500, CURRENT_DATE - INTERVAL '2 days', 100.00, 'completed', NOW() - INTERVAL '2 days');
 
--- 2.5 STATISTICAL_THRESHOLD TEST   
-INSERT INTO demo.orders (order_id, customer_id, order_date, total_amount, status, created_at)
-SELECT 
-    19000 + (d.day * 10) + o.order_row AS order_id,
-    c.customer_id,
-    CURRENT_DATE - (d.day || ' days')::interval AS order_date,
-    100.00 + (o.order_row * 20) AS total_amount,
-    'completed' AS status,
-    NOW() - (d.day || ' days')::interval AS created_at
-FROM generate_series(1, 10) AS d(day)
-CROSS JOIN generate_series(1, 7) AS o(order_row)
-CROSS JOIN (SELECT unnest(array[100, 101, 102, 300, 301]) AS customer_id) c;
-
 
 -- ============================================
 -- 3. TABLE CUSTOMER_DATAMART
@@ -122,13 +114,6 @@ SELECT
     'VIP-buyer'
 FROM generate_series(1, 10) AS g(num);
 
--- 3.4 CUSTOM_SQL TEST
-INSERT INTO demo.customer_datamart VALUES
-(21001, 'USA', 5000, 25, 'VIP-buyer'),
-(21002, 'UK', 4500, 30, 'VIP-buyer'),
-(21003, 'France', 6000, 35, 'VIP-buyer'),
-(21004, 'Germany', 5500, 28, 'VIP-buyer'),
-(21005, 'Spain', 4800, 32, 'VIP-buyer');
 
 
 -- ============================================

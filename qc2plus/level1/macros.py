@@ -66,21 +66,14 @@ SQL_MACROS = {
         -- Test: Email format validation on {{ column_name }}
         
         {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
-        -- {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$' %}
+        {% set regex_pattern = db_functions.email_regex() %} 
 
-
-        
-        {% if db_type == 'bigquery' %}
-           {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\\\\\\.[A-Za-z]{2,}$' %}
-         {% else %}
-         {% set regex_pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' %}
-         {% endif %}
 
         WITH invalid_emails AS (
             SELECT {{ column_name }}
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
-            AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}
+            AND {{ db_functions.regex_not_match(column_name, regex_pattern)}}
             {{ db_functions.limit(10) }}
         )
         SELECT 
@@ -96,7 +89,7 @@ SQL_MACROS = {
         HAVING (SELECT COUNT(*) 
                 FROM {{ schema }}.{{ model_name }}
                 WHERE {{ column_name }} IS NOT NULL
-                AND {{ db_functions.regex_not_match(column_name, regex_pattern) }}) > 0
+                AND {{ db_functions.regex_not_match(column_name, regex_pattern ) }}) > 0
     """,
 
 
@@ -146,41 +139,31 @@ SQL_MACROS = {
             SELECT {{ column_name }}
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
-            AND (
-                {% if db_type == 'bigquery' %}
-                    DATE({{ column_name }}) > {{ db_functions.current_date() }}
-                {% else %}
-                    {{ column_name }} > {{ db_functions.current_date() }}
-                {% endif %}
-            )
+            AND {{ db_functions.date_cast(column_name) }} > {{ db_functions.current_date() }}
             {{ db_functions.limit(10) }}
         )
         SELECT 
             '{{ column_name }}' AS column_name,
-            (SELECT COUNT(*) 
+            (
+            SELECT COUNT(*) 
             FROM {{ schema }}.{{ model_name }}
             WHERE {{ column_name }} IS NOT NULL
-            AND (
-                {% if db_type == 'bigquery' %}
-                    DATE({{ column_name }}) > {{ db_functions.current_date() }}
-                {% else %}
-                    {{ column_name }} > {{ db_functions.current_date() }}
-                {% endif %}
-            )) AS failed_rows,
+            AND {{ db_functions.date_cast(column_name) }} > {{ db_functions.current_date() }}
+        
+        ) AS failed_rows,
+
+
             (SELECT COUNT(*) FROM {{ schema }}.{{ model_name }}) AS total_rows,
             'Future dates found in {{ column_name }}' AS message,
             CONCAT('Invalid future values: ', {{ db_functions.string_agg(column_name) }}) AS invalid_examples
+
         FROM future_dates
-        HAVING (SELECT COUNT(*) 
-                FROM {{ schema }}.{{ model_name }}
-                WHERE {{ column_name }} IS NOT NULL
-                AND (
-                    {% if db_type == 'bigquery' %}
-                        DATE({{ column_name }}) > {{ db_functions.current_date() }}
-                    {% else %}
-                        {{ column_name }} > {{ db_functions.current_date() }}
-                    {% endif %}
-                )) > 0
+        HAVING (
+            SELECT COUNT(*) 
+            FROM {{ schema }}.{{ model_name }}
+            WHERE {{ column_name }} IS NOT NULL
+            AND  {{ db_functions.date_cast(column_name) }} > {{ db_functions.current_date() }}
+            )> 0
     """,
 
 
@@ -292,46 +275,52 @@ SQL_MACROS = {
     """,
 
     'freshness': """
-        -- Test: Data freshness check
-        
-        {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
+    -- Test: Data freshness check
+    
+    {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
+    {% set max_date_expr = 'MAX(' ~ column_name ~ ')' %}
+    
+    WITH freshness_check AS (
+        SELECT 
+            'data_freshness' AS column_name,
+            CASE 
+                WHEN {{ db_functions.date_cast(max_date_expr) }} < {{ db_functions.date_sub(db_functions.current_date(), max_age_days) }} THEN 1
+                ELSE 0
+            END AS failed_rows,
+            1 AS total_rows,
+            CONCAT(
+                'Data is stale. Latest record: ',
+                {{ db_functions.cast_text(max_date_expr) }},
+                ', Expected within: ',
+                '{{ max_age_days }} days'
+            ) AS message,
+            CONCAT('Latest date found: ', {{ db_functions.cast_text(max_date_expr) }}) AS invalid_examples
+        FROM {{ table_ref }}
+        WHERE {{ column_name }} IS NOT NULL
+    )
+    SELECT * FROM freshness_check
+    WHERE failed_rows = 1
+""",
 
-        WITH freshness_check AS (
-            SELECT 
-                'data_freshness' AS column_name,
-                CASE 
-                    WHEN {{ db_functions.date_cast('MAX(' ~ column_name ~ ')') }} < {{ db_functions.date_sub(db_functions.current_date(), max_age_days) }} THEN 1
-                    ELSE 0
-                END AS failed_rows,
-                1 AS total_rows,
-                CONCAT(
-                    'Data is stale. Latest record: ',
-                    {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }},
-                    ', Expected within: ',
-                    '{{ max_age_days }} days'
-                ) AS message,
-                CONCAT('Latest date found: ', {{ db_functions.cast_text('MAX(' ~ column_name ~ ')') }}) AS invalid_examples
-            FROM {{ table_ref }}
-            WHERE {{ column_name }} IS NOT NULL
-        )
-        SELECT * FROM freshness_check
-        WHERE failed_rows = 1
-    """,
 
     'accepted_benchmark_values': """
         -- Test: Benchmark values distribution validation on {{ column_name }}
 
         {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
-
-        WITH actual_distribution AS (
+        {% set expected_case %}
+                CASE
+                    {% for value, expected_pct in benchmark_values.items() %}
+                    WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                    {% endfor %}
+                    ELSE 0
+                END
+            {% endset %}
+            WITH actual_distribution AS (
             SELECT 
                 {{ column_name }},
                 COUNT(*) AS actual_count,
-                {% if db_type == 'bigquery' %}
-                    CAST(COUNT(*) AS FLOAT64) * 100.0 / CAST(SUM(COUNT(*)) OVER() AS FLOAT64) AS actual_percentage
-                {% else %}
-                    COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() AS actual_percentage
-                {% endif %}
+                {{ db_functions.float_cast('COUNT(*)') }} * 100.0 / {{ db_functions.float_cast('SUM(COUNT(*)) OVER()') }} AS actual_percentage
+
             FROM {{ table_ref }}
             WHERE {{ column_name }} IS NOT NULL
             GROUP BY {{ column_name }}
@@ -340,41 +329,18 @@ SQL_MACROS = {
             SELECT 
                 a.{{ column_name }},
                 a.actual_percentage,
-                {% if db_type == 'bigquery' %}
-                    CAST(CASE 
-                        {% for value, expected_pct in benchmark_values.items() %}
-                        WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
-                        {% endfor %}
-                        ELSE 0
-                    END AS FLOAT64) AS expected_percentage,
-                {% else %}
                     CASE 
-                        {% for value, expected_pct in benchmark_values.items() %}
-                        WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
-                        {% endfor %}
-                        ELSE 0
-                    END AS expected_percentage,
-                {% endif %}
+                    {% for value, expected_pct in benchmark_values.items() %}
+                    WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
+                    {% endfor %}
+                    ELSE 0
+                END AS expected_percentage,
                 ABS(
-                    {% if db_type == 'bigquery' %}
-                        CAST(COALESCE(a.actual_percentage, 0) AS FLOAT64)
-                        - CAST(COALESCE(
-                            CASE 
-                                {% for value, expected_pct in benchmark_values.items() %}
-                                WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
-                                {% endfor %}
-                                ELSE 0
-                            END, 0) AS FLOAT64)
-                    {% else %}
-                        COALESCE(a.actual_percentage, 0) 
-                        - COALESCE(
-                            CASE 
-                                {% for value, expected_pct in benchmark_values.items() %}
-                                WHEN a.{{ column_name }} = '{{ value }}' THEN {{ expected_pct }}
-                                {% endfor %}
-                                ELSE 0
-                            END, 0)
-                    {% endif %}
+
+                {{ db_functions.coalesce('a.actual_percentage', '0') }} -
+                {{ db_functions.coalesce(expected_case, '0') }}
+              
+                
                 ) AS percentage_diff
             FROM actual_distribution a
         ),
@@ -392,14 +358,9 @@ SQL_MACROS = {
                 CONCAT(
                     {{ db_functions.cast_text(column_name) }},
                     ' (',
-                    {% if db_type == 'bigquery' %}
-                        CAST(ROUND(actual_percentage, 1) AS STRING), '% vs ',
-                        CAST(expected_percentage AS STRING), '% expected)'
-                    {% else %}
-                        CAST(ROUND(actual_percentage, 1) AS VARCHAR), '% vs ',
-                        CAST(expected_percentage AS VARCHAR), '% expected)'
-                    {% endif %}
+                    {{ db_functions.format_percentage_diff('actual_percentage', 'expected_percentage') }}
                 ) AS violation_detail
+
             FROM benchmark_comparison
             WHERE percentage_diff > {{ threshold }} * 100
             {{ db_functions.limit(10) }}
@@ -411,8 +372,7 @@ SQL_MACROS = {
             'Benchmark violations found in distribution' AS message,
             CONCAT('Invalid distributions: ', {{ db_functions.string_agg('violation_detail') }}) AS invalid_examples
         FROM violations
-        CROSS JOIN violation_count
-        WHERE violation_count.total_violations > 0
+        HAVING COUNT(*) > 0
     """,
 
     'statistical_threshold': """

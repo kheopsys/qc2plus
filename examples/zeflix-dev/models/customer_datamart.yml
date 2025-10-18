@@ -51,14 +51,12 @@ models:
 
 
       level2:
-        # ✅ 1. Correlation between lifetime_value and order_frequency
         correlation_analysis:
             variables: [lifetime_value, order_frequency]
             expected_correlation: 0.7
             threshold: 0.2
             severity: medium
 
-        # ✅ 2. Distribution per country
         distribution_analysis:
             segments: [country]
             metrics: [count, avg_lifetime_value]
