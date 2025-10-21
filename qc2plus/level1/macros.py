@@ -99,11 +99,11 @@ SQL_MACROS = {
         {% set table_ref = build_sample_clause(sample_config, schema, model_name, db_type) %}
 
         WITH orphan_keys AS (
-            SELECT sampled_data.{{ column_name }}
-            FROM {{ table_ref }} AS sampled_data
+            SELECT table_ref.{{ column_name }}
+            FROM {{ table_ref }} AS table_ref 
             LEFT JOIN {{ schema }}.{{ reference_table }} ref 
-                ON sampled_data.{{ column_name }} = ref.{{ reference_column }}
-            WHERE sampled_data.{{ column_name }} IS NOT NULL
+                ON table_ref.{{ column_name }} = ref.{{ reference_column }}
+            WHERE table_ref.{{ column_name }} IS NOT NULL
             AND ref.{{ reference_column }} IS NULL
             {{ db_functions.limit(10) }}
         )
