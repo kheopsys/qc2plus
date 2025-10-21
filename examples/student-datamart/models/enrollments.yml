@@ -1,0 +1,110 @@
+# =====================================================
+# models/enrollments.yml
+# Configuration des tests pour la table ENROLLMENTS
+# =====================================================
+
+models:
+  - name: enrollments
+    description: "Tests de qualité sur les inscriptions"
+    
+    qc2plus_tests:
+      level1:
+
+        - relationship:
+            column_name: student_id
+            reference_table: students
+            reference_column: student_id
+            severity: critical
+            explanation: "Chaque inscription doit être liée à un étudiant existant"
+
+        - relationship:
+            column_name: course_id
+            reference_table: courses  
+            reference_column: course_id
+            severity: critical
+            explanation: "Chaque inscription doit être liée à un cours existant"
+
+        - unique:
+            column_name: enrollment_id
+            severity: critical
+            explanation: "Chaque inscription doit avoir un identifiant unique"
+        
+        - not_null:
+            column_name: student_id
+            severity: critical
+            explanation: "Chaque inscription doit être liée à un étudiant"
+        
+        - not_null:
+            column_name: course_id
+            severity: critical
+            explanation: "Chaque inscription doit être liée à un cours"
+        
+        - not_null:
+            column_name: enrollment_date
+            severity: critical
+            explanation: "La date d'inscription est obligatoire"
+        
+        - range_check:
+            column_name: grade
+            min_value: 0
+            max_value: 100
+            severity: high
+            explanation: "La note doit être entre 0 et 100"
+            allow_null: true
+        
+        - range_check:
+            column_name: payment_amount
+            min_value: 0
+            max_value: 10000
+            severity: high
+            explanation: "Le montant de paiement doit être entre 0 et 10000€"
+        
+        - accepted_values:
+            column_name: status
+            accepted_values: ['enrolled', 'in_progress', 'completed', 'dropped', 'failed']
+            severity: medium
+            explanation: "Le statut doit être enrolled, in_progress, completed, dropped ou failed"
+        
+        - accepted_values:
+            column_name: payment_status
+            accepted_values: ['paid', 'pending', 'partial', 'refunded', 'cancelled']
+            severity: medium
+            explanation: "Le statut de paiement doit être dans la liste prédéfinie"
+                
+        - custom_sql:
+            name: "abnormal_course_duration"
+            severity: medium
+            custom_sql: |
+              SELECT 
+                e.enrollment_id,
+                e.student_id,
+                c.course_name,
+                e.enrollment_date,
+                e.completion_date,
+                e.completion_date - e.enrollment_date as actual_duration,
+                c.duration_hours / 5 as expected_duration_days
+              FROM enrollments e
+              INNER JOIN courses c ON e.course_id = c.course_id
+              WHERE e.completion_date IS NOT NULL
+                AND (e.completion_date - e.enrollment_date) > (c.duration_hours / 5 + 60)
+            explanation: |
+              La durée réelle d'un cours (inscription à complétion) 
+              ne devrait pas dépasser la durée prévue de plus de 60 jours.
+              Cela peut indiquer un problème d'engagement étudiant.
+      
+
+      level2:
+        correlation_analysis:
+          variables: [payment_amount, grade] 
+          expected_correlation: 0.3
+          threshold: 0.2
+          explanation: |
+            Analyse de la corrélation entre montant payé et notes.
+            Une corrélation trop forte pourrait indiquer un problème.
+        
+        distribution_analysis:
+          segments: [status, payment_status]
+          metrics: [count, payment_amount]
+          description: |
+            Analyse de la répartition des statuts et paiements 
+            pour détecter des anomalies dans les patterns d'inscription.

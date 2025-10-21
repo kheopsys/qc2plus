@@ -1,0 +1,97 @@
+# =====================================================
+# models/courses.yml
+# Configuration des tests pour la table COURSES
+# =====================================================
+
+models:
+  - name: courses
+    description: "Tests de qualité sur les cours"
+    
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: course_id
+            severity: critical
+            explanation: "Chaque cours doit avoir un identifiant unique"
+
+        - unique:
+            column_name: course_code
+            severity: critical
+            explanation: "Le code du cours doit être unique"
+        
+        - not_null:
+            column_name: course_name
+            severity: critical
+            explanation: "Le nom du cours est obligatoire"
+        
+        - range_check:
+            column_name: price
+            min_value: 0
+            max_value: 10000
+            severity: high
+            explanation: "Le prix doit être entre 0 et 10000€"
+        
+        - range_check:
+            column_name: duration_hours
+            min_value: 1
+            max_value: 200
+            severity: high
+            explanation: "La durée doit être entre 1 et 200 heures"
+        
+        - accepted_values:
+            column_name: category
+            accepted_values: ['Math', 'Science', 'Language', 'IT', 'Arts', 'Finance', 'Marketing', 'Specialized']
+            severity: medium
+            explanation: "La catégorie doit être dans la liste prédéfinie"
+        
+        - accepted_values:
+            column_name: level
+            accepted_values: ['Beginner', 'Intermediate', 'Advanced']
+            severity: medium
+            explanation: "Le niveau doit être Beginner, Intermediate ou Advanced"
+        
+        - accepted_values:
+            column_name: status
+            accepted_values: ['active', 'inactive', 'full', 'cancelled']
+            severity: medium
+            explanation: "Le status doit être active, inactive, full ou cancelled"
+        
+        - range_check:
+            column_name: max_students
+            min_value: 1
+            max_value: 100
+            severity: medium
+            explanation: "La capacité maximale doit être entre 1 et 100 étudiants"
+        
+        # ============================================
+        # TESTS CUSTOM SQL
+        # ============================================
+        
+        # Test 10 : Cours actifs sans inscriptions
+        - custom_sql:
+            name: "active_courses_no_enrollments"
+            severity: medium
+            custom_sql: |
+              SELECT 
+                c.course_id,
+                c.course_name,
+                c.course_code,
+                c.status,
+                COUNT(e.enrollment_id) as enrollment_count
+              FROM courses c
+              LEFT JOIN enrollments e ON c.course_id = e.course_id
+              WHERE c.status = 'active'
+              GROUP BY c.course_id, c.course_name, c.course_code, c.status
+              HAVING COUNT(e.enrollment_id) = 0
+            explanation: |
+              Un cours actif devrait avoir au moins une inscription.
+              Si aucun étudiant n'est inscrit, le cours devrait être 
+              marqué comme inactif.
+
+      level2:
+        distribution_analysis:
+          segments: [category, level]
+          metrics: [count]
+          explanation: |
+            Analyse de la répartition des cours par catégorie 
+            et niveau pour détecter des déséquilibres.

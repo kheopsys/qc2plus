@@ -85,6 +85,13 @@ DB_LEVEL2_FUNCTIONS = {
 
 
 
+        "float_cast": lambda col: f"CAST({col} AS FLOAT)",
+        "format_percentage_diff": lambda actual, expected: (
+        f"CAST(ROUND({actual}, 1) AS VARCHAR), '% vs ', CAST({expected} AS VARCHAR), '% expected)'"
+    ),
+
+
+
     },
     'bigquery': {
         'current_date': lambda: "CURRENT_DATE()",
@@ -93,8 +100,7 @@ DB_LEVEL2_FUNCTIONS = {
         'date_trunc_week': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), WEEK(MONDAY))",
         'date_trunc_month': lambda col: f"DATE_TRUNC(CAST({col} AS DATE), MONTH)",
         'cast_date': lambda col: f"CAST({col} AS DATE)",
-        "float_cast": lambda col: f"CAST({col} AS FLOAT64)"  # BigQuery
-
+        "float_cast": lambda col: f"CAST({col} AS FLOAT64)" 
     },
     'snowflake': {
         'current_date': lambda: "CURRENT_DATE()",
@@ -105,4 +111,5 @@ DB_LEVEL2_FUNCTIONS = {
         'cast_date': lambda col: f"CAST({col} AS DATE)",
     },
 }
+
 

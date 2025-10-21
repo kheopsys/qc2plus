@@ -100,7 +100,7 @@ SQL_MACROS = {
 
         WITH orphan_keys AS (
             SELECT sampled_data.{{ column_name }}
-            FROM {{ table_ref }}
+            FROM {{ table_ref }} AS sampled_data
             LEFT JOIN {{ schema }}.{{ reference_table }} ref 
                 ON sampled_data.{{ column_name }} = ref.{{ reference_column }}
             WHERE sampled_data.{{ column_name }} IS NOT NULL

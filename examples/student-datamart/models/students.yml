@@ -1,0 +1,62 @@
+models:
+  - name: students
+    description: "Table des étudiants"
+    
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: student_id
+            severity: critical
+            explanation: "Chaque étudiant doit avoir un identifiant unique"
+        
+        - not_null:
+            column_name: first_name
+            severity: critical
+            explanation: "Le prénom est obligatoire"
+        
+        - not_null:
+            column_name: last_name
+            severity: critical
+            explanation: "Le nom est obligatoire"
+        
+        - not_null:
+            column_name: email
+            severity: critical
+            explanation: "L'email est obligatoire pour contacter l'étudiant"
+        
+        - email_format:
+            column_name: email
+            severity: medium
+            explanation: "L'email doit contenir @ et un domaine valide"
+        
+        - range_check:
+            column_name: age
+            min_value: 16
+            max_value: 99
+            severity: high 
+            explanation: "Âge valide pour un étudiant : entre 16 et 99 ans"
+    
+        
+        - accepted_values:
+            column_name: status
+            accepted_values: ['active', 'inactive', 'graduated']
+            severity: medium
+            explanation: "Le statut doit être active, inactive ou graduated"
+
+        - future_date:
+            column_name: created_at
+            severity: low
+
+      level2:
+        correlation_analysis:
+            variables: [nb_courses, total_spent]
+            expected_correlation: 0.6
+            threshold: 0.15
+            severity: low
+            explanation: "Analyse de la corrélation entre le nombre de cours et le montant dépensé"
+        distribution_analysis:
+            segments: [status]
+            metrics: [count, avg_age]
+            reference_period: 180
+            comparison_period: 30   
+            date_column: created_at
