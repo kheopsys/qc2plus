@@ -88,8 +88,3 @@ models:
             frequency: daily
             severity: medium
 
-        correlation_analysis:
-            variables: [age, created_at]
-            expected_correlation: 0.0
-            threshold: 0.4
-            severity: low

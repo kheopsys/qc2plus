@@ -4,7 +4,7 @@ student_datamart:
     dev:
       data_source:
         type: postgresql
-        host: postgresql-d18918c8-ob839afc9.database.cloud.ovh.net #postgres-data #{152.252.32.23}
+        host: postgresql-d18918c8-ob839afc9.database.cloud.ovh.net 
         port: 20184
         user: workshop_user
         password: qc2plus123
