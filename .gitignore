@@ -215,4 +215,9 @@ examples/data-for-test/
 examples/student-datamart/
 examples/basic/
 examples/test_level_2/
-examples\student-datamart-pd
+examples/student-datamart-pd
+*/student-datamart-pd/
+*/test_level_2/
+*/basic/
+*/zeflix-dev
+*/data-for-test/
