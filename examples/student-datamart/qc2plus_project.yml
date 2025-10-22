@@ -1,0 +1,28 @@
+name: student-datamart
+version: 1.0.0
+profile: student_datamart
+
+model-paths: ["models"]
+target-path: "target"
+log-path: "logs"
+
+
+alerting:
+  enabled_channels: [""] 
+  slack:
+    enabled: false
+    webhook_url: 
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"      
+    smtp_port: 587
+    username: "xxxx"
+    password: "xxxx" 
+    from_email: "xxx@xxx.com"
+    to_emails:
+      - "xx@xx.com"
+
+
+
+
+
