@@ -2,7 +2,6 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
 # C extensions
 *.so
 
@@ -209,3 +208,11 @@ __marimo__/
 examples/zeflix-dev/*.json
 .DS_Store
 examples/*/qc2plus_project.yml
+examples/*/__pycache__/
+examples/*/venv/
+examples/*/.venv/   
+examples/data-for-test/
+examples/student-datamart/
+examples/basic/
+examples/test_level_2/
+examples\student-datamart-pd

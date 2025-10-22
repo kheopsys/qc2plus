@@ -19,14 +19,7 @@ GRANT CREATE ON DATABASE qc2plus_workshop TO qc2plus;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO qc2plus; 
 
--- REVIEW pour les droits 
--- README pour la docs
--- RELATIONSHIP TABLES → MERGE
--- Tester les level 2 logiques de data quality pour chaque models
--- Temporalité des droits 
--- Ajouter tests de saisonalité (temporelle) dans les modèles 
--- Package pypy
--- Cleaning code
+
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO qc2plus;
@@ -99,51 +92,62 @@ CREATE TABLE enrollments (
 
 -- Étudiants CORRECTS
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Jean', 'Dupont', 'jean.dupont@email.com', '+33612345678', '2000-03-15', 25, 'Paris', 'France', '2023-01-10', 'active', 2450.00, 5),
-('Marie', 'Martin', 'marie.martin@email.com', '+33623456789', '1999-07-22', 26, 'Lyon', 'France', '2023-01-15', 'active', 3200.00, 7),
-('Pierre', 'Bernard', 'pierre.bernard@email.com', '+33634567890', '2001-11-08', 24, 'Marseille', 'France', '2023-02-01', 'active', 1850.00, 4),
-('Sophie', 'Dubois', 'sophie.dubois@email.com', '+33645678901', '1998-05-18', 27, 'Toulouse', 'France', '2023-02-10', 'active', 2980.00, 6),
-('Luc', 'Thomas', 'luc.thomas@email.com', '+33656789012', '2002-01-30', 23, 'Nice', 'France', '2023-02-15', 'active', 1420.00, 3),
 
-('Emma', 'Robert', 'emma.robert@email.com', '+33667890123', '1997-09-25', 28, 'Nantes', 'France', '2023-03-01', 'active', 4100.00, 9),
-('Lucas', 'Petit', 'lucas.petit@email.com', '+33678901234', '2000-12-12', 25, 'Strasbourg', 'France', '2023-03-05', 'active', 2650.00, 5),
-('Chloé', 'Durand', 'chloe.durand@email.com', '+33689012345', '2001-04-07', 24, 'Montpellier', 'France', '2023-03-10', 'active', 1920.00, 4),
-('Alexandre', 'Leroy', 'alexandre.leroy@email.com', '+33690123456', '1998-08-14', 27, 'Bordeaux', 'France', '2023-03-15', 'active', 3500.00, 8),
-('Julie', 'Moreau', 'julie.moreau@email.com', '+33601234567', '2002-06-20', 23, 'Lille', 'France', '2023-04-01', 'active', 1680.00, 3),
+-- FRANCE (15 étudiants - préférence Math + IT)
+INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
+('Jean', 'Dupont', 'jean.dupont@email.com', '+33612345678', '2000-03-15', 25, 'Paris', 'France', '2025-09-10', 'active', 2100.00, 5),
+('Marie', 'Martin', 'marie.martin@email.com', '+33623456789', '1999-07-22', 26, 'Paris', 'France', '2025-09-15', 'active', 2800.00, 6),
+('Pierre', 'Bernard', 'pierre.bernard@email.com', '+33634567890', '2001-11-08', 24, 'Lyon', 'France', '2025-10-01', 'active', 1350.00, 3),
+('Sophie', 'Dubois', 'sophie.dubois@email.com', '+33645678901', '1998-05-18', 27, 'Lyon', 'France', '2025-10-10', 'active', 2250.00, 5),
+('Luc', 'Thomas', 'luc.thomas@email.com', '+33656789012', '2002-01-30', 23, 'Marseille', 'France', '2025-10-15', 'active', 900.00, 2),
+('Emma', 'Robert', 'emma.robert@email.com', '+33667890123', '1997-09-25', 28, 'Paris', 'France', '2025-11-01', 'active', 3150.00, 7),
+('Lucas', 'Petit', 'lucas.petit@email.com', '+33678901234', '2000-12-12', 25, 'Toulouse', 'France', '2025-11-05', 'active', 1800.00, 4),
+('Chloé', 'Durand', 'chloe.durand@email.com', '+33689012345', '2001-04-07', 24, 'Nice', 'France', '2025-11-10', 'active', 1350.00, 3),
+('Alexandre', 'Leroy', 'alexandre.leroy@email.com', '+33690123456', '1998-08-14', 27, 'Bordeaux', 'France', '2025-11-15', 'active', 2700.00, 6),
+('Julie', 'Moreau', 'julie.moreau@email.com', '+33601234567', '2002-06-20', 23, 'Lille', 'France', '2025-12-01', 'active', 900.00, 2),
+('Thomas', 'Simon', 'thomas.simon@email.com', '+33612345679', '1999-10-05', 26, 'Nantes', 'France', '2025-12-05', 'active', 1800.00, 4),
+('Sarah', 'Laurent', 'sarah.laurent@email.com', '+33623456780', '2000-02-28', 25, 'Strasbourg', 'France', '2025-12-10', 'active', 1350.00, 3),
+('Antoine', 'Lefebvre', 'antoine.lefebvre@email.com', '+33634567891', '2001-07-16', 24, 'Rennes', 'France', '2025-09-01', 'active', 1800.00, 4),
+('Léa', 'Roux', 'lea.roux@email.com', '+33645678902', '1998-11-23', 27, 'Grenoble', 'France', '2025-09-05', 'active', 2700.00, 6),
+('Nicolas', 'Fournier', 'nicolas.fournier@email.com', '+33656789013', '2002-03-09', 23, 'Montpellier', 'France', '2025-10-01', 'active', 900.00, 2);
 
-('Thomas', 'Simon', 'thomas.simon@email.com', '+33612345679', '1999-10-05', 26, 'Rennes', 'France', '2023-04-05', 'active', 2340.00, 5),
-('Sarah', 'Laurent', 'sarah.laurent@email.com', '+33623456780', '2000-02-28', 25, 'Reims', 'France', '2023-04-10', 'active', 1890.00, 4),
-('Antoine', 'Lefebvre', 'antoine.lefebvre@email.com', '+33634567891', '2001-07-16', 24, 'Le Havre', 'France', '2023-04-15', 'active', 2150.00, 5),
-('Léa', 'Roux', 'lea.roux@email.com', '+33645678902', '1998-11-23', 27, 'Saint-Étienne', 'France', '2023-05-01', 'active', 3780.00, 8),
-('Nicolas', 'Fournier', 'nicolas.fournier@email.com', '+33656789013', '2002-03-09', 23, 'Toulon', 'France', '2023-05-05', 'active', 1120.00, 2),
+-- BELGIQUE (5 étudiants - forte préférence Language)
+INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
+('Liam', 'Dupont', 'liam.dupont@email.be', '+3224567890', '2000-01-10', 25, 'Brussels', 'Belgium', '2025-09-18', 'active', 1120.00, 4),
+('Olivia', 'Peeters', 'olivia.peeters@email.be', '+3235678901', '1999-06-22', 26, 'Brussels', 'Belgium', '2025-10-03', 'active', 1620.00, 5),
+('Noah', 'Janssens', 'noah.janssens@email.be', '+3246789012', '2001-09-14', 24, 'Antwerp', 'Belgium', '2025-10-19', 'active', 1320.00, 4),
+('Emma', 'Maes', 'emma.maes@email.be', '+3257890123', '1998-12-05', 27, 'Ghent', 'Belgium', '2025-11-07', 'active', 1920.00, 6),
+('Louis', 'Claes', 'louis.claes@email.be', '+3279012345', '2000-11-12', 25, 'Bruges', 'Belgium', '2025-12-11', 'active', 820.00, 3);
 
-('Camille', 'Girard', 'camille.girard@email.com', '+33667890124', '1997-12-31', 28, 'Grenoble', 'France', '2023-05-10', 'active', 4250.00, 9),
-('Julien', 'Bonnet', 'julien.bonnet@email.com', '+33678901235', '2000-05-11', 25, 'Angers', 'France', '2023-05-15', 'active', 1990.00, 4),
-('Laura', 'Lambert', 'laura.lambert@email.com', '+33689012346', '2001-09-19', 24, 'Dijon', 'France', '2023-06-01', 'active', 2420.00, 5),
-('Maxime', 'Fontaine', 'maxime.fontaine@email.com', '+33690123457', '1999-01-27', 26, 'Nîmes', 'France', '2023-06-05', 'active', 3120.00, 7),
-('Manon', 'Chevalier', 'manon.chevalier@email.com', '+33601234568', '2002-08-03', 23, 'Aix-en-Provence', 'France', '2023-06-10', 'active', 1560.00, 3);
+-- SUISSE (5 étudiants - forte préférence IT + Math)
+INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
+('Lukas', 'Müller', 'lukas.mueller@email.ch', '+41445678901', '2000-02-18', 25, 'Zurich', 'Switzerland', '2025-09-22', 'active', 2700.00, 6),
+('Anna', 'Schneider', 'anna.schneider@email.ch', '+41556789012', '1999-07-31', 26, 'Zurich', 'Switzerland', '2025-10-09', 'active', 3150.00, 7),
+('David', 'Fischer', 'david.fischer@email.ch', '+41667890123', '2001-10-14', 24, 'Geneva', 'Switzerland', '2025-10-26', 'active', 2250.00, 5),
+('Laura', 'Weber', 'laura.weber@email.ch', '+41778901234', '1998-05-27', 27, 'Basel', 'Switzerland', '2025-11-16', 'active', 2700.00, 6),
+('Marc', 'Meyer', 'marc.meyer@email.ch', '+41889012345', '2002-08-09', 23, 'Lausanne', 'Switzerland', '2025-12-03', 'active', 1800.00, 4);
 
 -- Étudiants avec PROBLÈMES (pour tests Niveau 1)
 
 -- Problème 1 : Email NULL
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Paul', 'Gauthier', NULL, '+33612340001', '2000-04-12', 25, 'Paris', 'France', '2023-07-01', 'active', 1850.00, 4);
+('Paul', 'Gauthier', NULL, '+33612340001', '2000-04-12', 25, 'Paris', 'France', '2025-10-15', 'active', 1350.00, 4);
 
 -- Problème 2 : Email mal formaté (sans @)
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Claire', 'Perrin', 'claire.perrin.email.com', '+33623450001', '1999-08-30', 26, 'Lyon', 'France', '2023-07-05', 'active', 2100.00, 5);
+('Claire', 'Perrin', 'claire.perrin.email.com', '+33623450001', '1999-08-30', 26, 'Lyon', 'France', '2025-10-16', 'active', 1800.00, 5);
 
 -- Problème 3 : Âge aberrant (trop vieux)
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Hugo', 'Rousseau', 'hugo.rousseau@email.com', '+33634560001', '1920-12-15', 250, 'Marseille', 'France', '2023-07-10', 'active', 890.00, 2);
+('Hugo', 'Rousseau', 'hugo.rousseau@email.com', '+33634560001', '1920-12-15', 250, 'Marseille', 'France', '2025-10-17', 'active', 450.00, 2);
 
 -- Problème 4 : Âge aberrant (trop jeune)
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Inès', 'Vincent', 'ines.vincent@email.com', '+33645670001', '2020-06-08', 5, 'Toulouse', 'France', '2023-07-15', 'active', 450.00, 1);
+('Inès', 'Vincent', 'ines.vincent@email.com', '+33645670001', '2020-06-08', 5, 'Toulouse', 'France', '2025-10-17', 'active', 300.00, 1);
 
 -- Problème 5 : Incohérence total_spent vs nb_courses (beaucoup de cours mais peu de dépenses)
 INSERT INTO students (first_name, last_name, email, phone, birth_date, age, city, country, registration_date, status, total_spent, nb_courses) VALUES
-('Nathan', 'Muller', 'nathan.muller@email.com', '+33656780001', '2002-02-20', 23, 'Nice', 'France', '2023-08-01', 'active', 250.00, 10);
+('Nathan', 'Muller', 'nathan.muller@email.com', '+33656780001', '2002-02-20', 23, 'Nice', 'France', '2025-10-19', 'active', 250.00, 10);
 
 -- =====================================================
 -- DONNÉES : COURSES (15 cours)
@@ -182,100 +186,163 @@ INSERT INTO courses (course_name, course_code, category, level, price, duration_
 -- RÈGLE DE CORRÉLATION ATTENDUE :
 -- Plus un étudiant a de courses (nb_courses), plus il dépense (total_spent)
 -- Moyenne : 450€ par cours
+-- =====================================================
+-- ENROLLMENTS AVEC PATTERNS TEMPORELS
+-- =====================================================
+-- Pattern sur 6 mois (Jan à Juin 2025)
+-- Baseline = 10 inscriptions/mois
+-- Janvier : Pic +50% = 15 inscriptions
+-- Mars : ANOMALIE +100% = 20 inscriptions (IT)
+-- Juin : ANOMALIE -80% = 2 inscriptions
+-- =====================================================
 
--- Jean Dupont (5 cours, 2450€) - Corrélation OK : 490€/cours
+-- JANVIER 2025 : Pic de rentrée (+50%)
+-- 15 inscriptions
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(1, 1, '2023-01-15', '2023-02-20', 85.50, 'completed', 350.00, 'paid'),
-(1, 4, '2023-02-01', '2023-03-05', 78.00, 'completed', 350.00, 'paid'),
-(1, 6, '2023-03-01', '2023-04-10', 92.00, 'completed', 300.00, 'paid'),
-(1, 10, '2023-04-15', '2023-05-20', 88.50, 'completed', 420.00, 'paid'),
-(1, 13, '2023-06-01', NULL, NULL, 'enrolled', 580.00, 'paid');
+-- France - Math + IT
+(1, 1, '2025-09-10', '2025-10-28', 85.50, 'completed', 350.00, 'paid'),
+(1, 9, '2025-09-11', NULL, NULL, 'enrolled', 420.00, 'paid'),
+(2, 2, '2025-09-15', '2025-11-10', 91.00, 'completed', 450.00, 'paid'),
+(2, 10, '2025-09-16', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(3, 1, '2025-09-20', '2025-11-05', 78.50, 'completed', 350.00, 'paid'),
 
--- Marie Martin (7 cours, 3200€) - Corrélation OK : 457€/cours
+-- Belgique - Language
+(16, 6, '2025-09-18', '2025-11-15', 82.00, 'completed', 300.00, 'paid'),
+(16, 8, '2025-09-19', NULL, NULL, 'enrolled', 300.00, 'paid'),
+(17, 6, '2025-09-24', '2025-11-20', 88.50, 'completed', 300.00, 'paid'),
+
+-- Suisse - IT + Math
+(21, 10, '2025-09-22', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(21, 2, '2025-09-23', '2025-12-05', 93.00, 'completed', 450.00, 'paid'),
+(22, 11, '2025-09-25', NULL, NULL, 'enrolled', 850.00, 'paid'),
+(22, 10, '2025-09-26', '2025-12-10', 89.50, 'completed', 650.00, 'paid'),
+
+-- France additions
+(4, 3, '2025-09-28', '2025-11-25', 84.00, 'completed', 480.00, 'paid'),
+(5, 4, '2025-09-29', '2025-11-20', 79.00, 'completed', 350.00, 'paid'),
+(6, 11, '2025-09-30', NULL, NULL, 'enrolled', 850.00, 'paid');
+
+-- FÉVRIER 2025 : Baseline normal
+-- 10 inscriptions
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(2, 2, '2023-01-20', '2023-03-10', 91.00, 'completed', 450.00, 'paid'),
-(2, 3, '2023-02-15', '2023-04-05', 88.00, 'completed', 650.00, 'paid'),
-(2, 7, '2023-03-10', '2023-05-01', 86.50, 'completed', 380.00, 'paid'),
-(2, 8, '2023-04-05', NULL, NULL, 'enrolled', 520.00, 'paid'),
-(2, 11, '2023-05-01', NULL, NULL, 'enrolled', 650.00, 'paid'),
-(2, 12, '2023-06-10', NULL, NULL, 'enrolled', 850.00, 'pending'),
-(2, 13, '2023-07-01', NULL, NULL, 'enrolled', 580.00, 'pending');
+(7, 1, '2025-10-05', '2025-12-01', 75.00, 'completed', 350.00, 'paid'),
+(8, 9, '2025-10-08', NULL, NULL, 'enrolled', 420.00, 'paid'),
+(9, 10, '2025-10-10', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(11, 1, '2025-10-12', '2025-12-05', 80.00, 'completed', 350.00, 'paid'),
 
--- Pierre Bernard (4 cours, 1850€) - Corrélation OK : 462€/cours
+(18, 7, '2025-10-14', '2025-12-10', 85.00, 'completed', 520.00, 'paid'),
+(19, 6, '2025-10-16', '2025-12-12', 87.50, 'completed', 300.00, 'paid'),
+
+(23, 2, '2025-10-18', '2025-09-01', 91.00, 'completed', 450.00, 'paid'),
+(24, 10, '2025-10-20', NULL, NULL, 'enrolled', 650.00, 'paid'),
+
+(4, 9, '2025-10-22', '2025-12-20', 83.00, 'completed', 420.00, 'paid'),
+(6, 12, '2025-10-24', NULL, NULL, 'enrolled', 580.00, 'paid');
+
+-- MARS 2025 : ANOMALIE - Pic inexpliqué (+100%) + Concentration IT
+-- 20 inscriptions (au lieu de 10) - 16 en IT !
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(3, 1, '2023-02-05', '2023-03-15', 72.50, 'completed', 350.00, 'paid'),
-(3, 6, '2023-02-20', '2023-04-01', 79.00, 'completed', 300.00, 'paid'),
-(3, 9, '2023-04-10', '2023-05-20', 82.00, 'completed', 300.00, 'paid'),
-(3, 10, '2023-05-25', NULL, NULL, 'enrolled', 420.00, 'paid');
+-- Explosion IT
+(1, 11, '2025-11-01', NULL, NULL, 'enrolled', 850.00, 'paid'),
+(2, 12, '2025-11-02', NULL, NULL, 'enrolled', 580.00, 'paid'),
+(7, 10, '2025-11-03', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(8, 11, '2025-11-04', NULL, NULL, 'enrolled', 850.00, 'paid'),
+(9, 12, '2025-11-05', NULL, NULL, 'enrolled', 580.00, 'paid'),
+(11, 10, '2025-11-06', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(12, 11, '2025-11-07', NULL, NULL, 'enrolled', 850.00, 'paid'),
+(13, 9, '2025-11-08', NULL, NULL, 'enrolled', 420.00, 'paid'),
+(14, 10, '2025-11-09', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(3, 10, '2025-11-10', NULL, NULL, 'enrolled', 650.00, 'paid'),
 
--- Emma Robert (9 cours, 4100€) - Corrélation OK : 455€/cours
+-- Belgique IT aussi
+(17, 9, '2025-11-11', NULL, NULL, 'enrolled', 420.00, 'paid'),
+(18, 10, '2025-11-12', NULL, NULL, 'enrolled', 650.00, 'paid'),
+
+-- Suisse IT
+(23, 11, '2025-11-13', NULL, NULL, 'enrolled', 850.00, 'paid'),
+(24, 12, '2025-11-14', NULL, NULL, 'enrolled', 580.00, 'paid'),
+(25, 10, '2025-11-15', NULL, NULL, 'enrolled', 650.00, 'paid'),
+
+-- Quelques non-IT
+(4, 6, '2025-11-16', NULL, NULL, 'enrolled', 300.00, 'paid'),
+(5, 7, '2025-11-17', NULL, NULL, 'enrolled', 520.00, 'paid'),
+(21, 3, '2025-11-18', NULL, NULL, 'enrolled', 480.00, 'paid'),
+(22, 2, '2025-11-19', NULL, NULL, 'enrolled', 450.00, 'paid'),
+(6, 2, '2025-11-20', NULL, NULL, 'enrolled', 450.00, 'paid');
+
+-- AVRIL 2025 : Retour baseline
+-- 10 inscriptions
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(6, 3, '2023-03-05', '2023-05-15', 95.00, 'completed', 650.00, 'paid'),
-(6, 5, '2023-03-10', '2023-05-01', 89.00, 'completed', 480.00, 'paid'),
-(6, 8, '2023-04-01', '2023-06-10', 91.50, 'completed', 520.00, 'paid'),
-(6, 11, '2023-05-05', NULL, NULL, 'enrolled', 650.00, 'paid'),
-(6, 12, '2023-06-01', NULL, NULL, 'enrolled', 850.00, 'paid'),
-(6, 13, '2023-07-01', NULL, NULL, 'enrolled', 580.00, 'paid'),
-(6, 2, '2023-04-20', '2023-06-25', 87.00, 'completed', 450.00, 'paid'),
-(6, 7, '2023-05-15', NULL, NULL, 'enrolled', 380.00, 'paid'),
-(6, 4, '2023-03-20', '2023-05-10', 84.50, 'completed', 350.00, 'paid');
+(13, 2, '2025-12-02', '2025-10-10', 84.00, 'completed', 450.00, 'paid'),
+(14, 3, '2025-12-04', '2025-10-12', 87.50, 'completed', 480.00, 'paid'),
+(15, 1, '2025-12-06', '2025-10-15', 82.00, 'completed', 350.00, 'paid'),
+(1, 12, '2025-12-08', NULL, NULL, 'enrolled', 580.00, 'paid'),
 
--- Inscriptions pour autres étudiants (corrélation normale)
+(19, 7, '2025-12-10', '2025-10-20', 88.00, 'completed', 520.00, 'paid'),
+(20, 6, '2025-12-12', '2025-10-22', 86.50, 'completed', 300.00, 'paid'),
+
+(23, 3, '2025-12-14', '2025-11-01', 92.00, 'completed', 480.00, 'paid'),
+(24, 9, '2025-12-16', NULL, NULL, 'enrolled', 420.00, 'paid'),
+
+(5, 6, '2025-12-18', '2025-10-25', 83.50, 'completed', 300.00, 'paid'),
+(7, 2, '2025-12-20', '2025-10-28', 85.00, 'completed', 450.00, 'paid');
+
+-- MAI 2025 : Baseline
+-- 10 inscriptions
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
--- Sophie Dubois (6 cours)
-(4, 2, '2023-02-15', '2023-04-10', 86.00, 'completed', 450.00, 'paid'),
-(4, 7, '2023-03-01', '2023-05-05', 83.50, 'completed', 380.00, 'paid'),
-(4, 10, '2023-04-10', '2023-05-25', 88.00, 'completed', 420.00, 'paid'),
-(4, 11, '2023-05-20', NULL, NULL, 'enrolled', 650.00, 'paid'),
-(4, 13, '2023-06-15', NULL, NULL, 'enrolled', 580.00, 'paid'),
-(4, 5, '2023-03-20', '2023-05-15', 81.00, 'completed', 480.00, 'paid'),
+(2, 3, '2025-09-02', NULL, NULL, 'enrolled', 480.00, 'paid'),
+(3, 9, '2025-09-04', NULL, NULL, 'enrolled', 420.00, 'paid'),
+(4, 10, '2025-09-06', NULL, NULL, 'enrolled', 650.00, 'paid'),
+(8, 2, '2025-09-08', '2025-11-18', 88.50, 'completed', 450.00, 'paid'),
 
--- Luc Thomas (3 cours)
-(5, 1, '2023-02-20', '2023-04-01', 75.00, 'completed', 350.00, 'paid'),
-(5, 6, '2023-03-10', '2023-05-10', 77.50, 'completed', 300.00, 'paid'),
-(5, 9, '2023-05-01', NULL, NULL, 'enrolled', 300.00, 'paid'),
+(16, 7, '2025-09-10', '2025-11-20', 87.00, 'completed', 520.00, 'paid'),
+(17, 8, '2025-09-12', '2025-11-22', 85.50, 'completed', 300.00, 'paid'),
 
--- Alexandre Leroy (8 cours)
-(9, 3, '2023-03-20', '2023-06-01', 92.00, 'completed', 650.00, 'paid'),
-(9, 5, '2023-03-25', '2023-05-20', 87.50, 'completed', 480.00, 'paid'),
-(9, 8, '2023-04-10', '2023-06-20', 89.00, 'completed', 520.00, 'paid'),
-(9, 11, '2023-05-15', NULL, NULL, 'enrolled', 650.00, 'paid'),
-(9, 12, '2023-06-05', NULL, NULL, 'enrolled', 850.00, 'paid'),
-(9, 13, '2023-07-10', NULL, NULL, 'enrolled', 580.00, 'paid'),
-(9, 2, '2023-04-01', '2023-06-05', 85.00, 'completed', 450.00, 'paid'),
-(9, 7, '2023-05-01', NULL, NULL, 'enrolled', 380.00, 'pending');
+(21, 12, '2025-09-14', NULL, NULL, 'enrolled', 580.00, 'paid'),
+(22, 11, '2025-09-16', NULL, NULL, 'enrolled', 850.00, 'paid'),
 
--- PROBLÈMES POUR TESTS NIVEAU 2
+(9, 2, '2025-09-18', NULL, NULL, 'enrolled', 450.00, 'paid'),
+(10, 1, '2025-09-20', '2025-11-25', 84.00, 'completed', 350.00, 'paid');
 
--- Problème : Corrélation rompue (Nathan Muller : 10 cours mais seulement 250€)
--- Attendu : ~4500€, Réel : 250€ → ANOMALIE !
+-- JUIN 2025 : ANOMALIE - Chute brutale (-80%)
+-- 2 inscriptions (au lieu de 10)
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(25, 1, '2023-08-05', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 2, '2023-08-06', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 4, '2023-08-07', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 6, '2023-08-08', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 7, '2023-08-09', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 9, '2023-08-10', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 10, '2023-08-11', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 5, '2023-08-12', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 13, '2023-08-13', NULL, NULL, 'enrolled', 25.00, 'paid'),
-(25, 8, '2023-08-14', NULL, NULL, 'enrolled', 25.00, 'paid');
+(12, 1, '2025-10-05', '2025-12-10', 76.00, 'completed', 350.00, 'paid'),
+(25, 3, '2025-10-15', '2025-12-15', 82.50, 'completed', 480.00, 'paid');
 
--- Problème : Grade aberrant (négatif)
+-- =====================================================
+-- ENROLLMENTS POUR ÉTUDIANT AVEC PROBLÈME CORRÉLATION
+-- =====================================================
+-- Student 30 (Nathan Anomalie) : 8 cours mais seulement 200€
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(10, 1, '2023-04-05', '2023-06-01', -25.00, 'completed', 350.00, 'paid');
+(30, 1, '2025-10-20', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 2, '2025-10-21', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 4, '2025-10-22', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 6, '2025-10-23', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 7, '2025-10-24', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 9, '2025-10-25', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 10, '2025-10-26', NULL, NULL, 'enrolled', 25.00, 'paid'),
+(30, 5, '2025-10-27', NULL, NULL, 'enrolled', 25.00, 'paid');
 
--- Problème : Grade aberrant (> 100)
-INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(12, 2, '2023-04-10', '2023-06-10', 150.00, 'completed', 450.00, 'paid');
+-- =====================================================
+-- ENROLLMENTS AVEC PROBLÈMES NIVEAU 1
+-- =====================================================
 
--- Problème : Foreign key invalide (cours inexistant)
+-- Problème : Grade négatif
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(15, 999, '2023-05-01', NULL, NULL, 'enrolled', 500.00, 'paid');
+(10, 2, '2025-12-05', '2025-10-01', -25.00, 'completed', 450.00, 'paid');
+
+-- Problème : Grade > 100
+INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
+(12, 3, '2025-12-10', '2025-10-10', 150.00, 'completed', 480.00, 'paid');
 
 -- Problème : Dates incohérentes (completion avant enrollment)
 INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
-(18, 3, '2023-06-15', '2023-05-01', 80.00, 'completed', 650.00, 'paid');
+(15, 4, '2025-10-15', '2025-09-01', 80.00, 'completed', 350.00, 'paid');
+
+-- Problème : Foreign key invalide (cours inexistant)
+INSERT INTO enrollments (student_id, course_id, enrollment_date, completion_date, grade, status, payment_amount, payment_status) VALUES
+(18, 999, '2025-09-01', NULL, NULL, 'enrolled', 500.00, 'paid');
 
 
 -- =====================================================
@@ -293,18 +360,6 @@ PROBLÈMES NIVEAU 1 (Tests déterministes) :
 7. Foreign key invalide : enrollment avec course_id = 999
 8. Dates incohérentes : enrollment avec student_id = 18
 
-PROBLÈMES NIVEAU 2 (Anomalies ML/IA) :
-1. Corrélation rompue : student_id = 25 (Nathan Muller)
-   - 10 cours mais seulement 250€ au lieu de ~4500€
-   - Cette anomalie sera détectée par l'analyse de corrélation
-
-STATISTIQUES ATTENDUES :
-- 25 étudiants au total
-- 20 étudiants corrects
-- 5 étudiants avec problèmes Niveau 1
-- 1 étudiant avec problème Niveau 2 (corrélation)
-- 15 cours disponibles
-- Corrélation attendue : ~450€ par cours en moyenne
 */
 
 SELECT 'Base de données workshop créée avec succès !' as message,

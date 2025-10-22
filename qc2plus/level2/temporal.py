@@ -249,7 +249,7 @@ class TemporalAnalyzer:
                 )
                 
                 seasonal_component = decomposition.seasonal
-                residual_component = decomposition.residual
+                residual_component = decomposition.resid
                 
                 # Check for unusual seasonal patterns
                 seasonal_std = seasonal_component.std()

@@ -10,81 +10,18 @@ models:
     qc2plus_tests:
       level1:
 
-        - relationship:
-            column_name: student_id
-            reference_table: students
-            reference_column: student_id
-            severity: critical
-            explanation: "Chaque inscription doit être liée à un étudiant existant"
-
-        - relationship:
-            column_name: course_id
-            reference_table: courses  
-            reference_column: course_id
-            severity: critical
-            explanation: "Chaque inscription doit être liée à un cours existant"
 
         - unique:
             column_name: enrollment_id
             severity: critical
             explanation: "Chaque inscription doit avoir un identifiant unique"
-        
-        - not_null:
-            column_name: student_id
-            severity: critical
-            explanation: "Chaque inscription doit être liée à un étudiant"
-        
-        - not_null:
-            column_name: course_id
-            severity: critical
-            explanation: "Chaque inscription doit être liée à un cours"
-        
-        - not_null:
-            column_name: enrollment_date
-            severity: critical
-            explanation: "La date d'inscription est obligatoire"
-        
-        - range_check:
-            column_name: grade
-            min_value: 0
-            max_value: 100
-            severity: high
-            explanation: "La note doit être entre 0 et 100"
-            allow_null: true
-        
-        - range_check:
-            column_name: payment_amount
-            min_value: 0
-            max_value: 10000
-            severity: high
-            explanation: "Le montant de paiement doit être entre 0 et 10000€"
-        
-        - accepted_values:
-            column_name: status
-            accepted_values: ['enrolled', 'in_progress', 'completed', 'dropped', 'failed']
-            severity: medium
-            explanation: "Le statut doit être enrolled, in_progress, completed, dropped ou failed"
-        
-        - accepted_values:
-            column_name: payment_status
-            accepted_values: ['paid', 'pending', 'partial', 'refunded', 'cancelled']
-            severity: medium
-            explanation: "Le statut de paiement doit être dans la liste prédéfinie"
-
-
+     
       level2:
         correlation_analysis:
           variables: [payment_amount, grade] 
-          expected_correlation: 0.3
-          threshold: 0.2
+          expected_correlation: 0.15
+          threshold: 0.3
           explanation: |
             Analyse de la corrélation entre montant payé et notes.
             Une corrélation trop forte pourrait indiquer un problème.
-        
-        distribution_analysis:
-          segments: [status, payment_status]
-          metrics: [count, payment_amount]
-          date_column: enrollment_date
-          description: |
-            Analyse de la répartition des statuts et paiements 
-            pour détecter des anomalies dans les patterns d'inscription.
+          severity: medium

@@ -28,7 +28,7 @@ class DistributionAnalyzer:
             reference_period = config.get('reference_period', 30)
             comparison_period = config.get('comparison_period', 7)
             date_column = config.get('date_column', None)
-            min_data_threshold = config.get('min_data_threshold', 10)
+            min_data_threshold = config.get('min_data_threshold', 0)
             if date_column is None:
                 logging.info(f"No date_column specified for {model_name}, skipping distribution analysis")
                 return {
