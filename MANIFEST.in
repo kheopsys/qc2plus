@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include qc2plus/level1/templates *.sql
+recursive-include qc2plus/templates *.yml
+prune tests
+prune examples
+prune docs
+prune scripts
+prune .github
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
