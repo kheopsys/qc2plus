@@ -1,4 +1,4 @@
-# QC2Plus API Documentation
+# QC2Plus Documentation
 
 Complete reference documentation for all QC2Plus classes, methods, and parameters.
 
