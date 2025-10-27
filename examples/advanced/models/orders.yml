@@ -4,6 +4,14 @@ models:
 
     qc2plus_tests:
       level1:
+
+        - relationship:
+            column_name: customer_id
+            reference_table: customers
+            reference_column: customer_id
+            severity: critical
+            explanation: "Chaque ordre doit être liée à un customer existant"
+
         - unique:
             column_name: order_id
             severity: critical
@@ -11,9 +19,11 @@ models:
         - not_null:
             column_name: customer_id
             severity: critical
+
         - not_null:
             column_name: order_date
             severity: critical
+
         - not_null:
             column_name: total_amount
             severity: critical
@@ -52,7 +62,6 @@ models:
 
 
       level2:
-
         distribution_analysis:
             segments: [status]
             metrics: [count, avg_total_amount, sum_total_amount]

@@ -1,12 +1,6 @@
 models:
   - name: user_sessions
     description: "Full coverage for session integrity, freshness and behavioral analytics"
-    sample:
-      method: random
-      size: 3
-      partitioned_by: session_date
-      partition_strategy: latest
-      partition_count: 2
 
     qc2plus_tests:
       level1:
@@ -44,6 +38,8 @@ models:
               FROM demo.user_sessions
               WHERE page_views > 80
               HAVING COUNT(*) > 0
+
+
       level2:
         temporal_analysis:
             date_column: session_date
@@ -53,6 +49,8 @@ models:
             window_days: 7
             frequency: daily
             severity: medium
+            explanation: "Surveillance quotidienne du NOMBRE de sessions et du TOTAL de pages vues pour détecter les anomalies"
+
         distribution_analysis:
             segments: [user_id]
             metrics: [count, sum_page_views]
@@ -61,10 +59,12 @@ models:
             comparison_period: 2
             behavior_change_threshold: 100
             severity: medium
-
+            explanation: "Est-ce que mes utilisateurs se comportent normalement au fil du temps?
+                          Pour chaque utilisateur, surveille : son NOMBRE de sessions et son TOTAL de pages vues"
 
         correlation_analysis:
             variables: [page_views, session_date]
             expected_correlation: 0.0
             threshold: 0.5
             severity: low
+            explanation: "Est-ce que Le nombre de pages vues est corrélé avec la date de session"

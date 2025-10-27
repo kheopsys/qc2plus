@@ -8,20 +8,20 @@ log-path: "logs"
 
 
 alerting:
-alerting:
-  enabled_channels: [""] 
+  enabled_channels: ["slack", "email"] 
+  
   slack:
-    enabled: false
-    webhook_url: 
+    webhook_url: ${"SLACK_WEBHOOK_URL"}
+    
   email:
-    enabled: false
     smtp_server: "smtp.gmail.com"      
     smtp_port: 587
-    username: "xxxx"
-    password: "xxxx" 
-    from_email: "xxx@xxx.com"
+    username: ${"EMAIL_USERNAME"}
+    password: ${"EMAIL_PASSWORD"}
+    from_email: ${"EMAIL_FROM"}
     to_emails:
-      - "xx@xx.com"
+      - ${"EMAIL_TO_1"}
+      - ${"EMAIL_TO_2"} 
 
 
 

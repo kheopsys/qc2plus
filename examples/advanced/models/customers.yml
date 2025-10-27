@@ -7,8 +7,7 @@ models:
         - unique:
             column_name: email
             severity: critical
-            sample: null
-
+           
         - email_format:
             column_name: email
             severity: high
@@ -79,6 +78,7 @@ models:
             comparison_period: 7
             behavior_change_threshold: 80
             severity: medium
+            
         temporal_analysis:
             date_column: created_at
             metrics: [count]

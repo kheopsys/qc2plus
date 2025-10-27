@@ -9,8 +9,6 @@ models:
     
     qc2plus_tests:
       level1:
-
-
         - unique:
             column_name: enrollment_id
             severity: critical

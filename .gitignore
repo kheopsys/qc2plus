@@ -214,12 +214,14 @@ examples/*/data-for-test/
 examples/*/student-datamart/
 examples/*/basic/
 examples/test_level_2/
-examples/student-datamart-pd
+examples/student-datamart/*
 */student-datamart-pd/
 */test_level_2/
 */basic/
 */zeflix-dev
 */data-for-test/
 docker-compose-old.yml
-
-
+=3.0.0
+docker-compose.override-old.yml
+à faire.md
+qc2plus-internal.egg-info/

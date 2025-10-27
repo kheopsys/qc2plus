@@ -1,4 +1,4 @@
-advanced_example:
+advanced:
   target: dev
   outputs:
     dev:

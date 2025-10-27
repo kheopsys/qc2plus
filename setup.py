@@ -18,14 +18,20 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="qc2plus",
-    version="1.0.0",
+    version="1.0.2",
     author="QC2Plus Team",
-    author_email="contact-qc2plus@kheopsys.com",
+    author_email="qc2plus@kheopsys.com",
     description="Data Quality Automation Framework with ML-powered anomaly detection",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/kheopsys/qc2plus-internal",
-    packages=find_packages(),
+    packages=find_packages(exclude=[
+    "examples",
+    "examples.*",
+    "tests",
+    "tests.*",
+
+]),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Analytics engineers",
