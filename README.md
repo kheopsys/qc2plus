@@ -231,7 +231,7 @@ qc2plus run --target prod --fail-fast
 
 ### 📖 Complete Guides
 
-- **[API Documentation](QC2PLUS_DOCUMENTATION.md)** - Complete parameter reference
+- **[QC2PLUS Documentation](QC2PLUS_DOCUMENTATION.md)** - Complete parameter reference
 - **[User Guide](https://qc2plus.readthedocs.io/user-guide)** - Comprehensive tutorials
 - **[Examples](https://github.com/qc2plus/examples)** - Real-world use cases
 - **[Contributing](CONTRIBUTING.md)** - Development guide
