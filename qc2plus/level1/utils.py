@@ -4,54 +4,53 @@ Jinja2 templates for business rule validation tests
 """
 
 from typing import Any, Dict, Optional
+
 from qc2plus.sql.db_functions import DB_FUNCTIONS
+
 
 def get_macro_help(macro_name: str) -> str:
     """Get help text for a specific macro"""
-    
+
     help_text = {
-        'unique': """
+        "unique": """
         Tests that all values in a column are unique.
-        
+
         Parameters:
         - column_name: Column to test
         - severity: Test severity level
-        
+
         Example:
         unique:
           column_name: customer_id
           severity: critical
         """,
-        
-        'not_null': """
+        "not_null": """
         Tests that a column contains no null values.
-        
+
         Parameters:
         - column_name: Column to test
         - severity: Test severity level
-        
+
         Example:
         not_null:
           column_name: email
           severity: critical
         """,
-        
-        'email_format': """
+        "email_format": """
         Tests that email addresses follow valid format.
-        
+
         Parameters:
         - column_name: Email column to validate
         - severity: Test severity level
-        
+
         Example:
         email_format:
           column_name: email_address
           severity: medium
         """,
-        
-        'statistical_threshold': """
+        "statistical_threshold": """
         Tests statistical thresholds based on historical data.
-        
+
         Parameters:
         - column_name: Column to analyze (optional for table-level metrics)
         - metric: Metric to calculate (count, avg, sum, min, max)
@@ -59,7 +58,7 @@ def get_macro_help(macro_name: str) -> str:
         - threshold_value: Threshold value or standard deviation multiplier
         - window_days: Historical window in days (default: 30)
         - severity: Test severity level
-        
+
         Example:
         statistical_threshold:
           metric: count
@@ -67,17 +66,18 @@ def get_macro_help(macro_name: str) -> str:
           threshold_value: 2.0
           window_days: 30
           severity: medium
-        """
+        """,
     }
-    
+
     return help_text.get(macro_name, "No help available for this macro.")
+
 
 # Sampling with partition support (multi-database compatible)
 def build_sample_clause(
     sample_config: Optional[Dict[str, Any]],
     schema: str,
     model_name: str,
-    db_type: str = "postgresql"
+    db_type: str = "postgresql",
 ) -> str:
     """
     Build SQL sampling clause with integrated partition support.
@@ -112,7 +112,9 @@ def build_sample_clause(
             start_date = sample_config.get("partition_start")
             end_date = sample_config.get("partition_end")
             if start_date and end_date:
-                partition_filter = f"{partition_column} BETWEEN '{start_date}' AND '{end_date}'"
+                partition_filter = (
+                    f"{partition_column} BETWEEN '{start_date}' AND '{end_date}'"
+                )
 
         elif strategy == "list":
             partition_list = sample_config.get("partition_list", [])
@@ -130,7 +132,7 @@ def build_sample_clause(
             # ✅ BigQuery : use RAND() < pct instead of TABLESAMPLE
             if db_type == "bigquery":
                 return f"""(
-                    SELECT * 
+                    SELECT *
                     FROM {base_table}
                     WHERE {partition_filter}
                     AND RAND() < {pct}
@@ -160,7 +162,7 @@ def build_sample_clause(
 
             if db_type == "bigquery":
                 return f"""(
-                    SELECT * 
+                    SELECT *
                     FROM {base_table}
                     WHERE RAND() < {pct}
                 ) AS sampled_data"""

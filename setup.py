@@ -18,7 +18,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="qc2plus",
-    version="1.0.2",
+    version="1.0.3",
     author="QC2Plus Team",
     author_email="qc2plus@kheopsys.com",
     description="Data Quality Automation Framework with ML-powered anomaly detection",

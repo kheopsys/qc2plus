@@ -58,7 +58,7 @@ services:
     depends_on:
       postgres-data:
         condition: service_healthy
-    restart: unless-stopped  # Redémarre en cas d'échec #AaDDDED
+    restart: unless-stopped 
     networks:
       - qc2plus-network
     command: tail -f /dev/null

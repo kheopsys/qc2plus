@@ -204,24 +204,43 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-
-examples/zeflix-dev/*.json
+# ========================================
+# CRITICAL: Credentials and Secrets
+# ========================================
+.env
+.env.*
+secrets.yml
+*.json
+!example*.json
+!**/example*.json
+# ========================================
+# QC2Plus Internal Specific Ignore Rules
 .DS_Store
-examples/*/__pycache__/
-examples/*/venv/
-examples/*/.venv/   
-examples/*/data-for-test/
-examples/*/student-datamart/
-examples/*/basic/
+# SSH keys
+*.key
+id_rsa*
+*.ppk
+
+# Virtual environments
+venv/
+examples/**/__pycache__/
+examples/**/venv/
+examples/**/.venv/  
+# Ignore specific example folders
+examples/student-datamart/
 examples/test_level_2/
-examples/student-datamart/*
-*/student-datamart-pd/
-*/test_level_2/
-*/basic/
-*/zeflix-dev
-*/data-for-test/
-docker-compose-old.yml
-=3.0.0
-docker-compose.override-old.yml
+examples/basic/
+examples/zeflix-dev/
+examples/data-for-test/
+examples/test_level_2/=3.0.0
 à faire.md
 qc2plus-internal.egg-info/
+bugs.md
+
+
+# ========================================
+# Docker
+# ========================================
+docker-compose.override.yml
+.dockerignore
+.secrets.baseline

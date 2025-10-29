@@ -46,7 +46,7 @@ class TestLevel1Engine:
         
         expected_tests = [
             'unique', 'not_null', 'email_format', 
-            'foreign_key', 'future_date', 'statistical_threshold'
+            'relationship', 'future_date', 'statistical_threshold'
         ]
         
         for test in expected_tests:

@@ -3,382 +3,511 @@
 Saves quality test results to database tables for Power BI integration
 """
 
-import logging
-import uuid
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 import json
+import logging
+import time
+import uuid
+from datetime import datetime
+from functools import wraps
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 
 from qc2plus.core.connection import ConnectionManager
 
 
+def retry_on_db_error(max_retries=3, delay=1, backoff=2):
+    """
+    Retry decorator for database operations.
+    Only retries on operational errors (connection issues),
+    not on data errors (integrity violations, invalid data).
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+
+                except (IntegrityError, DataError) as e:
+                    # Don't retry data errors - fail immediately
+                    logging.error(f"{func.__name__}: Data error (no retry): {str(e)}")
+                    raise
+
+                except OperationalError as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        wait_time = delay * (backoff**attempt)
+                        logging.warning(
+                            f"{func.__name__}: DB connection error "
+                            f"(retry {
+                                attempt + 1}/{max_retries} after {wait_time}s): "
+                            f"{type(e).__name__}"
+                        )
+                        time.sleep(wait_time)
+                    else:
+                        logging.error(
+                            f"{func.__name__}: Max retries reached after "
+                            f"{max_retries} attempts"
+                        )
+                        raise
+
+                except Exception as e:
+                    # Unknown errors - log and raise immediately
+                    logging.error(
+                        f"{func.__name__}: Unexpected error (no retry): "
+                        f"{type(e).__name__}: {str(e)}"
+                    )
+                    raise
+
+            # Should never reach here, but just in case
+            if last_exception:
+                raise last_exception
+
+        return wrapper
+
+    return decorator
+
+
 class PersistenceManager:
     """Manages persistence of quality test results to database"""
-    
-    def __init__(self, connection_manager: ConnectionManager, config: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        connection_manager: ConnectionManager,
+        config: Optional[Dict[str, Any]] = None,
+    ):
         self.connection_manager = connection_manager
         self.config = config or {}
-        
+
         # Determine if we have separate databases for data and quality
-        if hasattr(connection_manager, 'quality_config') and connection_manager.quality_config:
+        if (
+            hasattr(connection_manager, "quality_config")
+            and connection_manager.quality_config
+        ):
             print("Using separate quality database configuration")
-            self.schema = connection_manager.quality_config.get('schema', 'public')
+            self.schema = connection_manager.quality_config.get("schema", "public")
         else:
             print("Using same database for data and quality")
-            self.schema = connection_manager.data_config.get('schema', 'public')
-        
- 
-    
+            self.schema = connection_manager.data_config.get("schema", "public")
+
+    @retry_on_db_error(max_retries=3)
     def save_run_summary(self, results: Dict[str, Any]) -> None:
         """Save run summary to quality_run_summary table"""
-        
+
         try:
             # Prepare data
             run_data = {
-                'run_id': results.get('run_id', str(uuid.uuid4())),
-                'project_name': results.get('project_name', 'unknown'),
-                'execution_time': datetime.now(),
-                'target_environment': results.get('target', 'unknown'),
-                'total_models': len(results.get('models', {})),
-                'total_tests': results.get('total_tests', 0),
-                'passed_tests': results.get('passed_tests', 0),
-                'failed_tests': results.get('failed_tests', 0),
-                'critical_failures': results.get('critical_failures', 0),
-                'execution_duration_seconds': results.get('execution_duration', 0),
-                'status': results.get('status', 'unknown')
+                "run_id": results.get("run_id", str(uuid.uuid4())),
+                "project_name": results.get("project_name", "unknown"),
+                "execution_time": datetime.now(),
+                "target_environment": results.get("target", "unknown"),
+                "total_models": len(results.get("models", {})),
+                "total_tests": results.get("total_tests", 0),
+                "passed_tests": results.get("passed_tests", 0),
+                "failed_tests": results.get("failed_tests", 0),
+                "critical_failures": results.get("critical_failures", 0),
+                "execution_duration_seconds": results.get("execution_duration", 0),
+                "status": results.get("status", "unknown"),
             }
-            
+
             # Build insert SQL with individual values
             columns = list(run_data.keys())
-            columns_str = ', '.join(columns)
-            placeholders = ', '.join([f":{c}" for c in columns])
-            
+            columns_str = ", ".join(columns)
+            placeholders = ", ".join([f":{c}" for c in columns])
+
             sql = f"""
-                INSERT INTO {self.schema}.quality_run_summary 
-                ({columns_str}) 
+                INSERT INTO {self.schema}.quality_run_summary
+                ({columns_str})
                 VALUES ({placeholders})
             """
-            
+
             # Execute insert with individual values (not a list)
-            self.connection_manager.execute_sql(sql,params=run_data, use_data_source=False)
-            
+            # self.connection_manager.execute_sql(
+            #    sql, params=run_data, use_data_source=False
+            # )
+            with self.connection_manager.quality_engine.begin() as conn:
+                conn.execute(text(sql), run_data)
+
             logging.info(f"Run summary saved: {run_data['run_id']}")
-            
+
         except Exception as e:
             logging.error(f"Failed to save run summary: {str(e)}")
             raise
-    
+
     def save_test_results(self, results: Dict[str, Any]) -> None:
         """Save individual test results to quality_test_results table"""
-        
+
         try:
             test_records = []
-            
+
             # Extract test results from each model
-            for model_name, model_results in results.get('models', {}).items():
-                
+            for model_name, model_results in results.get("models", {}).items():
+
                 # Level 1 test results
-                for test_name, test_result in model_results.get('level1', {}).items():
+                for test_name, test_result in model_results.get("level1", {}).items():
                     if isinstance(test_result, dict):
                         record = {
-                            'test_id': str(uuid.uuid4()),
-                            'model_name': model_name,
-                            'test_name': test_name,
-                            'test_type': self._extract_test_type(test_name),
-                            'level': 'Level 1',
-                            'severity': test_result.get('severity', 'medium'),
-                            'status': 'passed' if test_result.get('passed', False) else 'failed',
-                            'message': test_result.get('message', ''),
-                            'failed_rows': test_result.get('failed_rows', 0),
-                            'total_rows': test_result.get('total_rows', 0),
-                            'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown'),
-                            'explanation': test_result.get('explanation', ''),
-                            'examples': json.dumps(test_result.get('examples', [])) if test_result.get('examples') else '',
-                            'query': test_result.get('query', '')
+                            "test_id": str(uuid.uuid4()),
+                            "model_name": model_name,
+                            "test_name": test_name,
+                            "test_type": self._extract_test_type(test_name),
+                            "level": "Level 1",
+                            "severity": test_result.get("severity", "medium"),
+                            "status": (
+                                "passed"
+                                if test_result.get("passed", False)
+                                else "failed"
+                            ),
+                            "message": test_result.get("message", ""),
+                            "failed_rows": test_result.get("failed_rows", 0),
+                            "total_rows": test_result.get("total_rows", 0),
+                            "execution_time": datetime.now(),
+                            "target_environment": results.get("target", "unknown"),
+                            "explanation": test_result.get("explanation", ""),
+                            "examples": (
+                                json.dumps(test_result.get("examples", []))
+                                if test_result.get("examples")
+                                else ""
+                            ),
+                            "query": test_result.get("query", ""),
                         }
                         test_records.append(record)
-                
-
-
-
 
                 # Level 2 test results
-                for analyzer_name, analyzer_result in model_results.get('level2', {}).items():
+                for (
+                    analyzer_name,
+                    analyzer_result,
+                ) in model_results.get("level2", {}).items():
                     if isinstance(analyzer_result, dict):
                         record = {
-                            'test_id': str(uuid.uuid4()),
-                            'model_name': model_name,
-                            'test_name': analyzer_name,
-                            'test_type': analyzer_name,
-                            'level': 'Level 2',
-                            'severity': 'medium',  # Level 2 anomalies are typically medium
-                            'status': 'passed' if analyzer_result.get('passed', False) else 'failed',
-                            'message': analyzer_result.get('message', ''),
-                            'failed_rows': analyzer_result.get('anomalies_count', 0),
-                            'total_rows': 1,  # Level 2 tests are typically binary pass/fail
-                            'execution_time': datetime.now(),
-                            'target_environment': results.get('target', 'unknown'),
-                        
-                            'explanation': f"Analysis of anomalies type : {analyzer_name}",
-                            'examples': '',
-                            'query': ''
-                            
-                        
+                            "test_id": str(uuid.uuid4()),
+                            "model_name": model_name,
+                            "test_name": analyzer_name,
+                            "test_type": analyzer_name,
+                            "level": "Level 2",
+                            "severity": "medium",  # Level 2 anomalies are typically medium
+                            "status": (
+                                "passed"
+                                if analyzer_result.get("passed", False)
+                                else "failed"
+                            ),
+                            "message": analyzer_result.get("message", ""),
+                            "failed_rows": analyzer_result.get("anomalies_count", 0),
+                            "total_rows": 1,  # Level 2 tests are typically binary pass/fail
+                            "execution_time": datetime.now(),
+                            "target_environment": results.get("target", "unknown"),
+                            "explanation": f"Analysis of anomalies type : {analyzer_name}",
+                            "examples": "",
+                            "query": "",
                         }
                         test_records.append(record)
-            
+
             # Batch insert test records
             if test_records:
                 self._batch_insert_test_results(test_records)
                 logging.info(f"Saved {len(test_records)} test results")
-            
+
         except Exception as e:
             logging.error(f"Failed to save test results: {str(e)}")
             raise
-    
+
     def save_anomalies(self, results: Dict[str, Any]) -> None:
         """Save Level 2 anomaly details to quality_anomalies table"""
-        
+
         try:
             anomaly_records = []
-            
-            
+
             # Extract anomalies from Level 2 results
-            for model_name, model_results in results.get('models', {}).items():
-                
-                for analyzer_name, analyzer_result in model_results.get('level2', {}).items():
-                    if isinstance(analyzer_result, dict) and not analyzer_result.get('passed', True):
-                        
-                        details = analyzer_result.get('details', {})
-                        target_environment = results.get('target', 'unknown')
-                        
+            for model_name, model_results in results.get("models", {}).items():
+
+                for (
+                    analyzer_name,
+                    analyzer_result,
+                ) in model_results.get("level2", {}).items():
+                    if isinstance(analyzer_result, dict) and not analyzer_result.get(
+                        "passed", True
+                    ):
+
+                        details = analyzer_result.get("details", {})
+                        target_environment = results.get("target", "unknown")
+
                         # Extract specific anomalies based on analyzer type
-                        if analyzer_name == 'correlation':
+                        if analyzer_name == "correlation":
                             anomalies = self._extract_correlation_anomalies(
-                                details
-                                ,model_name
-                                , analyzer_name
-                                ,target_environment)
-                        elif analyzer_name == 'temporal':
-                            anomalies = self._extract_temporal_anomalies(details, model_name, analyzer_name, target_environment)
-                        elif analyzer_name == 'distribution':
-                            anomalies = self._extract_distribution_anomalies(details, model_name, analyzer_name, target_environment)
+                                details,
+                                model_name,
+                                analyzer_name,
+                                target_environment,
+                            )
+                        elif analyzer_name == "temporal":
+                            anomalies = self._extract_temporal_anomalies(
+                                details,
+                                model_name,
+                                analyzer_name,
+                                target_environment,
+                            )
+                        elif analyzer_name == "distribution":
+                            anomalies = self._extract_distribution_anomalies(
+                                details,
+                                model_name,
+                                analyzer_name,
+                                target_environment,
+                            )
                         else:
                             # Generic anomaly
-                            anomalies = [{
-                                'anomaly_id': str(uuid.uuid4()),
-                                'model_name': model_name,
-                                'analyzer_type': analyzer_name,
-                                'anomaly_type': 'generic',
-                                'anomaly_score': 1.0,
-                                'affected_columns': '',
-                                'anomaly_details': json.dumps(analyzer_result),
-                                'detection_time': datetime.now(),
-                                'severity': 'medium',
-                                'target_environment': target_environment
-                            }]
-                        
+                            anomalies = [
+                                {
+                                    "anomaly_id": str(uuid.uuid4()),
+                                    "model_name": model_name,
+                                    "analyzer_type": analyzer_name,
+                                    "anomaly_type": "generic",
+                                    "anomaly_score": 1.0,
+                                    "affected_columns": "",
+                                    "anomaly_details": json.dumps(analyzer_result),
+                                    "detection_time": datetime.now(),
+                                    "severity": "medium",
+                                    "target_environment": target_environment,
+                                }
+                            ]
+
                         anomaly_records.extend(anomalies)
-            
+
             # Batch insert anomaly records
             if anomaly_records:
                 self._batch_insert_anomalies(anomaly_records)
                 logging.info(f"Saved {len(anomaly_records)} anomaly records")
-            
+
         except Exception as e:
             logging.error(f"Failed to save anomalies: {str(e)}")
             raise
-    
+
     def _extract_test_type(self, test_name: str) -> str:
         """Extract test type from test name"""
-        
+
         # Common test types
         test_types = {
-            'unique': 'unique',
-            'not_null': 'not_null',
-            'email_format': 'email_format',
-            'foreign_key': 'foreign_key',
-            'future_date': 'future_date',
-            'statistical_threshold': 'statistical_threshold',
-            'accepted_values': 'accepted_values',
-            'range_check': 'range_check'
+            "unique": "unique",
+            "not_null": "not_null",
+            "email_format": "email_format",
+            "foreign_key": "foreign_key",
+            "future_date": "future_date",
+            "statistical_threshold": "statistical_threshold",
+            "accepted_values": "accepted_values",
+            "range_check": "range_check",
         }
-        
+
         for test_type, type_name in test_types.items():
             if test_type in test_name.lower():
                 return type_name
-        
-        return 'custom'
-    
+
+        return "custom"
+
     def _batch_insert_test_results(self, test_records: List[Dict[str, Any]]) -> None:
         """Batch insert test results"""
-        
+
         if not test_records:
             return
-        
+
         # Build batch insert SQL
         columns = list(test_records[0].keys())
-        columns_str = ', '.join(columns)
-        placeholders = ', '.join([f":{c}" for c in columns])
-        
+        columns_str = ", ".join(columns)
+        placeholders = ", ".join([f":{c}" for c in columns])
+
         sql = f"""
-            INSERT INTO {self.schema}.quality_test_results 
-            ({columns_str}) 
+            INSERT INTO {self.schema}.quality_test_results
+            ({columns_str})
             VALUES ({placeholders})
         """
-        
-        # Execute individual inserts (fix the list issue)
-        for record in test_records:
-            #values = [record[col] for col in columns]
-            self.connection_manager.execute_sql(sql, params=record, use_data_source=False)
-    
+
+        try:
+            with self.connection_manager.quality_engine.begin() as conn:
+                for record in test_records:
+                    conn.execute(text(sql), record)
+            logging.debug(f"Batch inserted {len(test_records)} test results")
+        except Exception as e:
+            logging.error(f"Batch insert failed: {str(e)}")
+            raise
+
     def _batch_insert_anomalies(self, anomaly_records: List[Dict[str, Any]]) -> None:
         """Batch insert anomaly records"""
         if not anomaly_records:
             return
-        
+
         # Build batch insert SQL
         columns = list(anomaly_records[0].keys())
-        columns_str = ', '.join(columns)
-        placeholders = ', '.join([f":{c}" for c in columns])
-        
+        columns_str = ", ".join(columns)
+        placeholders = ", ".join([f":{c}" for c in columns])
+
         sql = f"""
-            INSERT INTO {self.schema}.quality_anomalies 
-            ({columns_str}) 
+            INSERT INTO {self.schema}.quality_anomalies
+            ({columns_str})
             VALUES ({placeholders})
         """
 
-        
-        # Execute individual inserts (fix the list issue)
-        for record in anomaly_records:
-            #values = [record[col] for col in columns]
-            self.connection_manager.execute_sql(sql, params=record, use_data_source=False)
-    
-    def _extract_correlation_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                     analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
+        try:
+            with self.connection_manager.quality_engine.begin() as conn:
+                for record in anomaly_records:
+                    conn.execute(text(sql), record)
+            logging.debug(f"Batch inserted {len(anomaly_records)} anomalies")
+        except Exception as e:
+            logging.error(f"Batch insert anomalies failed: {str(e)}")
+            raise
+
+    def _extract_correlation_anomalies(
+        self,
+        details: Dict[str, Any],
+        model_name: str,
+        analyzer_name: str,
+        target_environment: str,
+    ) -> List[Dict[str, Any]]:
         """Extract correlation-specific anomalies"""
-        
+
         anomalies = []
-        
+
         # Static correlation anomalies
-        static_results = details.get('static_correlation', {})
-        for anomaly in static_results.get('anomalies', []):
-            anomalies.append({
-                'anomaly_id': str(uuid.uuid4()),
-                'model_name': model_name,
-                'analyzer_type': analyzer_name,
-                'anomaly_type': 'correlation_deviation',
-                'anomaly_score': abs(anomaly.get('correlation', 0)),
-                'affected_columns': anomaly.get('variable_pair', ''),
-                'anomaly_details': json.dumps(anomaly),
-                'detection_time': datetime.now(),
-                'severity': anomaly.get('severity', 'medium'),
-                'target_environment': target_environment   # Will be set by caller
-            })
-        
+        static_results = details.get("static_correlation", {})
+        for anomaly in static_results.get("anomalies", []):
+            anomalies.append(
+                {
+                    "anomaly_id": str(uuid.uuid4()),
+                    "model_name": model_name,
+                    "analyzer_type": analyzer_name,
+                    "anomaly_type": "correlation_deviation",
+                    "anomaly_score": abs(anomaly.get("correlation", 0)),
+                    "affected_columns": anomaly.get("variable_pair", ""),
+                    "anomaly_details": json.dumps(anomaly),
+                    "detection_time": datetime.now(),
+                    "severity": anomaly.get("severity", "medium"),
+                    "target_environment": target_environment,  # Will be set by caller
+                }
+            )
+
         # Temporal correlation anomalies
-        temporal_results = details.get('temporal_correlation', {})
-        for anomaly in temporal_results.get('anomalies', []):
-            anomalies.append({
-                'anomaly_id': str(uuid.uuid4()),
-                'model_name': model_name,
-                'analyzer_type': analyzer_name,
-                'anomaly_type': anomaly.get('anomaly_type', 'temporal_correlation'),
-                'anomaly_score': anomaly.get('correlation_std', 0),
-                'affected_columns': anomaly.get('variable_pair', ''),
-                'anomaly_details': json.dumps(anomaly),
-                'detection_time': datetime.now(),
-                'severity': anomaly.get('severity', 'medium'),
-                'target_environment': 'unknown'
-            })
-        
+        temporal_results = details.get("temporal_correlation", {})
+        for anomaly in temporal_results.get("anomalies", []):
+            anomalies.append(
+                {
+                    "anomaly_id": str(uuid.uuid4()),
+                    "model_name": model_name,
+                    "analyzer_type": analyzer_name,
+                    "anomaly_type": anomaly.get("anomaly_type", "temporal_correlation"),
+                    "anomaly_score": anomaly.get("correlation_std", 0),
+                    "affected_columns": anomaly.get("variable_pair", ""),
+                    "anomaly_details": json.dumps(anomaly),
+                    "detection_time": datetime.now(),
+                    "severity": anomaly.get("severity", "medium"),
+                    "target_environment": "unknown",
+                }
+            )
+
         return anomalies
-    
-    def _extract_temporal_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                  analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
+
+    def _extract_temporal_anomalies(
+        self,
+        details: Dict[str, Any],
+        model_name: str,
+        analyzer_name: str,
+        target_environment: str,
+    ) -> List[Dict[str, Any]]:
         """Extract temporal-specific anomalies"""
-        
+
         anomalies = []
-        
+
         # Extract from individual analyses
-        individual_analyses = details.get('individual_analyses', {})
-        
+        individual_analyses = details.get("individual_analyses", {})
+
         for metric, metric_results in individual_analyses.items():
-            for anomaly in metric_results.get('anomalies', []):
-                anomalies.append({
-                    'anomaly_id': str(uuid.uuid4()),
-                    'model_name': model_name,
-                    'analyzer_type': analyzer_name,
-                    'anomaly_type': anomaly.get('type', 'temporal'),
-                    'anomaly_score': anomaly.get('z_score', anomaly.get('magnitude', 1.0)),
-                    'affected_columns': metric,
-                    'anomaly_details': json.dumps(anomaly),
-                    'detection_time': datetime.now(),
-                    'severity': anomaly.get('severity', 'medium'),
-                    'target_environment': target_environment
-                })
-        
+            for anomaly in metric_results.get("anomalies", []):
+                anomalies.append(
+                    {
+                        "anomaly_id": str(uuid.uuid4()),
+                        "model_name": model_name,
+                        "analyzer_type": analyzer_name,
+                        "anomaly_type": anomaly.get("type", "temporal"),
+                        "anomaly_score": anomaly.get(
+                            "z_score", anomaly.get("magnitude", 1.0)
+                        ),
+                        "affected_columns": metric,
+                        "anomaly_details": json.dumps(anomaly),
+                        "detection_time": datetime.now(),
+                        "severity": anomaly.get("severity", "medium"),
+                        "target_environment": target_environment,
+                    }
+                )
+
         return anomalies
-    
-    def _extract_distribution_anomalies(self, details: Dict[str, Any], model_name: str, 
-                                      analyzer_name: str, target_environment: str) -> List[Dict[str, Any]]:
+
+    def _extract_distribution_anomalies(
+        self,
+        details: Dict[str, Any],
+        model_name: str,
+        analyzer_name: str,
+        target_environment: str,
+    ) -> List[Dict[str, Any]]:
         """Extract distribution-specific anomalies"""
-        
+
         anomaly_records = []
-        
+
         # Extract from individual segment analyses
-        anomalies = details.get('anomalies', [])
+        anomalies = details.get("anomalies", [])
         for anomaly in anomalies:
             # Determine anomaly score based on type
-            if anomaly.get('type') == 'segment_share_shift':
+            if anomaly.get("type") == "segment_share_shift":
                 # For share shifts, use absolute share change
-                anomaly_score = abs(float(anomaly.get('share_change', 0)))
-            elif anomaly.get('type') == 'segment_behavior_anomaly':
+                anomaly_score = abs(float(anomaly.get("share_change", 0)))
+            elif anomaly.get("type") == "segment_behavior_anomaly":
                 # For behavior anomalies, use absolute percent change
-                anomaly_score = abs(float(anomaly.get('percent_change', 0)))
+                anomaly_score = abs(float(anomaly.get("percent_change", 0)))
             else:
                 anomaly_score = 1.0
-            segment = anomaly.get('segment', 'unknown_segment')
-            segment_value = anomaly.get('segment_value', 'unknown_value')
-            metric = anomaly.get('metric', 'unknown_metric')
+            segment = anomaly.get("segment", "unknown_segment")
+            segment_value = anomaly.get("segment_value", "unknown_value")
+            metric = anomaly.get("metric", "unknown_metric")
             affected_columns = f"{segment}:{segment_value}:{metric}"
             anomaly_details = {
-                'type': anomaly.get('type'),
-                'segment': segment,
-                'segment_value': segment_value,
-                'metric': metric,
-                'description': anomaly.get('description', '')
+                "type": anomaly.get("type"),
+                "segment": segment,
+                "segment_value": segment_value,
+                "metric": metric,
+                "description": anomaly.get("description", ""),
             }
- 
-            anomaly_records.append({
-                'anomaly_id': str(uuid.uuid4()),
-                'model_name': model_name,
-                'analyzer_type': analyzer_name,
-                'anomaly_type': anomaly.get('type', 'distribution_anomaly'),
-                'anomaly_score': float(anomaly_score),
-                'affected_columns': affected_columns,
-                'anomaly_details':  json.dumps(anomaly_details, default=str),
-                'detection_time': datetime.now(),
-                'severity': anomaly.get('severity', 'medium'),
-                'target_environment': target_environment
-            })
+
+            anomaly_records.append(
+                {
+                    "anomaly_id": str(uuid.uuid4()),
+                    "model_name": model_name,
+                    "analyzer_type": analyzer_name,
+                    "anomaly_type": anomaly.get("type", "distribution_anomaly"),
+                    "anomaly_score": float(anomaly_score),
+                    "affected_columns": affected_columns,
+                    "anomaly_details": json.dumps(anomaly_details, default=str),
+                    "detection_time": datetime.now(),
+                    "severity": anomaly.get("severity", "medium"),
+                    "target_environment": target_environment,
+                }
+            )
 
         return anomaly_records
-    
-    def get_quality_history(self, model_name: Optional[str] = None, 
-                          days: int = 30) -> Dict[str, Any]:
+
+    def get_quality_history(
+        self, model_name: Optional[str] = None, days: int = 30
+    ) -> Dict[str, Any]:
         """Get quality test history for analysis"""
-        
+
         try:
             # Build base query
             where_clause = f"execution_time >= CURRENT_DATE - INTERVAL '{days} days'"
             if model_name:
                 where_clause += f" AND model_name = '{model_name}'"
-            
+
             # Get run summaries
             run_summary_sql = f"""
-                SELECT 
+                SELECT
                     run_id,
                     execution_time,
                     target_environment,
@@ -391,10 +520,10 @@ class PersistenceManager:
                 WHERE {where_clause}
                 ORDER BY execution_time DESC
             """
-            
+
             # Get test results
             test_results_sql = f"""
-                SELECT 
+                SELECT
                     model_name,
                     test_type,
                     level,
@@ -407,10 +536,10 @@ class PersistenceManager:
                 GROUP BY model_name, test_type, level, severity, status, execution_time
                 ORDER BY execution_time DESC
             """
-            
+
             # Get anomalies
             anomalies_sql = f"""
-                SELECT 
+                SELECT
                     model_name,
                     analyzer_type,
                     anomaly_type,
@@ -423,45 +552,49 @@ class PersistenceManager:
                 GROUP BY model_name, analyzer_type, anomaly_type, severity, detection_time
                 ORDER BY detection_time DESC
             """
-            
+
             # Adapt for different databases
-            if self.connection_manager.db_type  == 'bigquery':
-                run_summary_sql = run_summary_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+            if self.connection_manager.db_type == "bigquery":
+                run_summary_sql = run_summary_sql.replace(
+                    "CURRENT_DATE", "CURRENT_DATE()"
+                )
                 run_summary_sql = run_summary_sql.replace("INTERVAL '", "INTERVAL ")
                 run_summary_sql = run_summary_sql.replace(" days'", " DAY")
-                
-                test_results_sql = test_results_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+
+                test_results_sql = test_results_sql.replace(
+                    "CURRENT_DATE", "CURRENT_DATE()"
+                )
                 test_results_sql = test_results_sql.replace("INTERVAL '", "INTERVAL ")
                 test_results_sql = test_results_sql.replace(" days'", " DAY")
-                
-                anomalies_sql = anomalies_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+
+                anomalies_sql = anomalies_sql.replace("CURRENT_DATE", "CURRENT_DATE()")
                 anomalies_sql = anomalies_sql.replace("INTERVAL '", "INTERVAL ")
                 anomalies_sql = anomalies_sql.replace(" days'", " DAY")
-            
+
             # Execute queries
             run_summaries = self.connection_manager.execute_query(run_summary_sql)
             test_results = self.connection_manager.execute_query(test_results_sql)
             anomalies = self.connection_manager.execute_query(anomalies_sql)
-            
+
             return {
-                'run_summaries': run_summaries.to_dict('records'),
-                'test_results': test_results.to_dict('records'),
-                'anomalies': anomalies.to_dict('records'),
-                'period_days': days,
-                'model_filter': model_name
+                "run_summaries": run_summaries.to_dict("records"),
+                "test_results": test_results.to_dict("records"),
+                "anomalies": anomalies.to_dict("records"),
+                "period_days": days,
+                "model_filter": model_name,
             }
-            
+
         except Exception as e:
             logging.error(f"Failed to get quality history: {str(e)}")
-            return {'error': str(e)}
-    
+            return {"error": str(e)}
+
     def get_quality_trends(self, days: int = 90) -> Dict[str, Any]:
         """Get quality trends over time"""
-        
+
         try:
             trends_sql = f"""
                 WITH daily_summary AS (
-                    SELECT 
+                    SELECT
                         DATE(execution_time) as date,
                         target_environment,
                         AVG(CAST(passed_tests AS FLOAT) / NULLIF(total_tests, 0)) as success_rate,
@@ -471,235 +604,271 @@ class PersistenceManager:
                     WHERE execution_time >= CURRENT_DATE - INTERVAL '{days} days'
                     GROUP BY DATE(execution_time), target_environment
                 )
-                SELECT 
+                SELECT
                     date,
                     target_environment,
                     success_rate,
                     daily_critical_failures,
                     daily_runs,
                     AVG(success_rate) OVER (
-                        PARTITION BY target_environment 
-                        ORDER BY date 
+                        PARTITION BY target_environment
+                        ORDER BY date
                         ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
                     ) as rolling_7day_success_rate
                 FROM daily_summary
                 ORDER BY target_environment, date
             """
-            
+
             # Adapt for different databases
-            if self.connection_manager.db_type  == 'bigquery':
-                trends_sql = trends_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+            if self.connection_manager.db_type == "bigquery":
+                trends_sql = trends_sql.replace("CURRENT_DATE", "CURRENT_DATE()")
                 trends_sql = trends_sql.replace("INTERVAL '", "INTERVAL ")
                 trends_sql = trends_sql.replace(" days'", " DAY")
-            elif self.connection_manager.db_type  == 'snowflake':
-                trends_sql = trends_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+            elif self.connection_manager.db_type == "snowflake":
+                trends_sql = trends_sql.replace("CURRENT_DATE", "CURRENT_DATE()")
                 trends_sql = trends_sql.replace(" days'", " DAY'")
-            
+
             trends_data = self.connection_manager.execute_query(trends_sql)
-            
+
             return {
-                'trends': trends_data.to_dict('records'),
-                'period_days': days
+                "trends": trends_data.to_dict("records"),
+                "period_days": days,
             }
-            
+
         except Exception as e:
             logging.error(f"Failed to get quality trends: {str(e)}")
-            return {'error': str(e)}
-    
+            return {"error": str(e)}
+
     def cleanup_old_data(self, retention_days: int = 365) -> Dict[str, int]:
         """Clean up old quality data beyond retention period"""
-        
+
         try:
             cleanup_results = {}
-            
+
             # Clean up run summaries
             run_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_run_summary
                 WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days'
             """
-            
+
             # Clean up test results
             test_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_test_results
                 WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days'
             """
-            
+
             # Clean up anomalies
             anomaly_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_anomalies
                 WHERE detection_time < CURRENT_DATE - INTERVAL '{retention_days} days'
             """
-            
+
             # Adapt for different databases
-            if self.connection_manager.db_type  == 'bigquery':
-                run_cleanup_sql = run_cleanup_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+            if self.connection_manager.db_type == "bigquery":
+                run_cleanup_sql = run_cleanup_sql.replace(
+                    "CURRENT_DATE", "CURRENT_DATE()"
+                )
                 run_cleanup_sql = run_cleanup_sql.replace("INTERVAL '", "INTERVAL ")
                 run_cleanup_sql = run_cleanup_sql.replace(" days'", " DAY")
-                
-                test_cleanup_sql = test_cleanup_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
+
+                test_cleanup_sql = test_cleanup_sql.replace(
+                    "CURRENT_DATE", "CURRENT_DATE()"
+                )
                 test_cleanup_sql = test_cleanup_sql.replace("INTERVAL '", "INTERVAL ")
                 test_cleanup_sql = test_cleanup_sql.replace(" days'", " DAY")
-                
-                anomaly_cleanup_sql = anomaly_cleanup_sql.replace('CURRENT_DATE', 'CURRENT_DATE()')
-                anomaly_cleanup_sql = anomaly_cleanup_sql.replace("INTERVAL '", "INTERVAL ")
+
+                anomaly_cleanup_sql = anomaly_cleanup_sql.replace(
+                    "CURRENT_DATE", "CURRENT_DATE()"
+                )
+                anomaly_cleanup_sql = anomaly_cleanup_sql.replace(
+                    "INTERVAL '", "INTERVAL "
+                )
                 anomaly_cleanup_sql = anomaly_cleanup_sql.replace(" days'", " DAY")
-            
+
             # Execute cleanup
             run_result = self.connection_manager.execute_sql(run_cleanup_sql)
-            cleanup_results['run_summaries_deleted'] = run_result.rowcount if hasattr(run_result, 'rowcount') else 0
-            
+            cleanup_results["run_summaries_deleted"] = (
+                run_result.rowcount if hasattr(run_result, "rowcount") else 0
+            )
+
             test_result = self.connection_manager.execute_sql(test_cleanup_sql)
-            cleanup_results['test_results_deleted'] = test_result.rowcount if hasattr(test_result, 'rowcount') else 0
-            
+            cleanup_results["test_results_deleted"] = (
+                test_result.rowcount if hasattr(test_result, "rowcount") else 0
+            )
+
             anomaly_result = self.connection_manager.execute_sql(anomaly_cleanup_sql)
-            cleanup_results['anomalies_deleted'] = anomaly_result.rowcount if hasattr(anomaly_result, 'rowcount') else 0
-            
+            cleanup_results["anomalies_deleted"] = (
+                anomaly_result.rowcount if hasattr(anomaly_result, "rowcount") else 0
+            )
+
             logging.info(f"Cleanup completed: {cleanup_results}")
-            
+
             return cleanup_results
-            
+
         except Exception as e:
             logging.error(f"Failed to cleanup old data: {str(e)}")
-            return {'error': str(e)}
-    
-    def export_quality_report(self, model_name: Optional[str] = None, 
-                            days: int = 30, format: str = 'json') -> Dict[str, Any]:
+            return {"error": str(e)}
+
+    def export_quality_report(
+        self,
+        model_name: Optional[str] = None,
+        days: int = 30,
+        format: str = "json",
+    ) -> Dict[str, Any]:
         """Export comprehensive quality report"""
-        
+
         try:
             # Get all data
             history = self.get_quality_history(model_name, days)
             trends = self.get_quality_trends(days)
-            
-            if 'error' in history or 'error' in trends:
-                return {'error': 'Failed to retrieve quality data'}
-            
+
+            if "error" in history or "error" in trends:
+                return {"error": "Failed to retrieve quality data"}
+
             # Compile comprehensive report
             report = {
-                'report_metadata': {
-                    'generated_at': datetime.now().isoformat(),
-                    'model_filter': model_name,
-                    'period_days': days,
-                    'format': format
+                "report_metadata": {
+                    "generated_at": datetime.now().isoformat(),
+                    "model_filter": model_name,
+                    "period_days": days,
+                    "format": format,
                 },
-                'summary_statistics': self._calculate_summary_stats(history),
-                'historical_data': history,
-                'trend_analysis': trends,
-                'top_failing_tests': self._get_top_failing_tests(history),
-                'anomaly_patterns': self._analyze_anomaly_patterns(history)
+                "summary_statistics": self._calculate_summary_stats(history),
+                "historical_data": history,
+                "trend_analysis": trends,
+                "top_failing_tests": self._get_top_failing_tests(history),
+                "anomaly_patterns": self._analyze_anomaly_patterns(history),
             }
-            
-            if format == 'json':
+
+            if format == "json":
                 return report
-            elif format == 'csv':
+            elif format == "csv":
                 # Convert to CSV-friendly format
                 return self._convert_report_to_csv(report)
             else:
-                return {'error': f'Unsupported format: {format}'}
-                
+                return {"error": f"Unsupported format: {format}"}
+
         except Exception as e:
             logging.error(f"Failed to export quality report: {str(e)}")
-            return {'error': str(e)}
-    
+            return {"error": str(e)}
+
     def _calculate_summary_stats(self, history: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate summary statistics from historical data"""
-        
-        run_summaries = history.get('run_summaries', [])
-        test_results = history.get('test_results', [])
-        anomalies = history.get('anomalies', [])
-        
+
+        run_summaries = history.get("run_summaries", [])
+        test_results = history.get("test_results", [])
+        anomalies = history.get("anomalies", [])
+
         if not run_summaries:
-            return {'error': 'No run summaries available'}
-        
+            return {"error": "No run summaries available"}
+
         # Calculate overall statistics
         total_runs = len(run_summaries)
-        total_tests = sum(run.get('total_tests', 0) for run in run_summaries)
-        total_passed = sum(run.get('passed_tests', 0) for run in run_summaries)
-        total_failed = sum(run.get('failed_tests', 0) for run in run_summaries)
-        total_critical = sum(run.get('critical_failures', 0) for run in run_summaries)
-        
+        total_tests = sum(run.get("total_tests", 0) for run in run_summaries)
+        total_passed = sum(run.get("passed_tests", 0) for run in run_summaries)
+        total_failed = sum(run.get("failed_tests", 0) for run in run_summaries)
+        total_critical = sum(run.get("critical_failures", 0) for run in run_summaries)
+
         success_rate = (total_passed / max(total_tests, 1)) * 100
-        
+
         return {
-            'total_runs': total_runs,
-            'total_tests': total_tests,
-            'overall_success_rate': round(success_rate, 2),
-            'total_failures': total_failed,
-            'critical_failures': total_critical,
-            'total_anomalies': len(anomalies),
-            'unique_models_tested': len(set(test.get('model_name', '') for test in test_results))
+            "total_runs": total_runs,
+            "total_tests": total_tests,
+            "overall_success_rate": round(success_rate, 2),
+            "total_failures": total_failed,
+            "critical_failures": total_critical,
+            "total_anomalies": len(anomalies),
+            "unique_models_tested": len(
+                set(test.get("model_name", "") for test in test_results)
+            ),
         }
-    
+
     def _get_top_failing_tests(self, history: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Get most frequently failing tests"""
-        
-        test_results = history.get('test_results', [])
-        
+
+        test_results = history.get("test_results", [])
+
         # Count failures by test type
         failure_counts = {}
         for test in test_results:
-            if test.get('status') == 'failed':
-                test_key = f"{test.get('model_name', '')}:{test.get('test_type', '')}"
-                failure_counts[test_key] = failure_counts.get(test_key, 0) + test.get('test_count', 1)
-        
+            if test.get("status") == "failed":
+                test_key = f"{
+                    test.get(
+                        'model_name',
+                        '')}:{
+                    test.get(
+                        'test_type',
+                        '')}"
+                failure_counts[test_key] = failure_counts.get(test_key, 0) + test.get(
+                    "test_count", 1
+                )
+
         # Sort by failure count
-        top_failures = sorted(failure_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        
-        return [{'test': test, 'failure_count': count} for test, count in top_failures]
-    
+        top_failures = sorted(failure_counts.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
+
+        return [{"test": test, "failure_count": count} for test, count in top_failures]
+
     def _analyze_anomaly_patterns(self, history: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze patterns in anomalies"""
-        
-        anomalies = history.get('anomalies', [])
-        
+
+        anomalies = history.get("anomalies", [])
+
         if not anomalies:
-            return {'message': 'No anomalies found in the specified period'}
-        
+            return {"message": "No anomalies found in the specified period"}
+
         # Group by analyzer type
         analyzer_counts = {}
         for anomaly in anomalies:
-            analyzer = anomaly.get('analyzer_type', 'unknown')
-            analyzer_counts[analyzer] = analyzer_counts.get(analyzer, 0) + anomaly.get('anomaly_count', 1)
-        
+            analyzer = anomaly.get("analyzer_type", "unknown")
+            analyzer_counts[analyzer] = analyzer_counts.get(analyzer, 0) + anomaly.get(
+                "anomaly_count", 1
+            )
+
         # Group by severity
         severity_counts = {}
         for anomaly in anomalies:
-            severity = anomaly.get('severity', 'unknown')
-            severity_counts[severity] = severity_counts.get(severity, 0) + anomaly.get('anomaly_count', 1)
-        
+            severity = anomaly.get("severity", "unknown")
+            severity_counts[severity] = severity_counts.get(severity, 0) + anomaly.get(
+                "anomaly_count", 1
+            )
+
         return {
-            'anomalies_by_analyzer': analyzer_counts,
-            'anomalies_by_severity': severity_counts,
-            'total_anomalies': sum(anomaly.get('anomaly_count', 1) for anomaly in anomalies)
+            "anomalies_by_analyzer": analyzer_counts,
+            "anomalies_by_severity": severity_counts,
+            "total_anomalies": sum(
+                anomaly.get("anomaly_count", 1) for anomaly in anomalies
+            ),
         }
-    
+
     def _convert_report_to_csv(self, report: Dict[str, Any]) -> Dict[str, str]:
         """Convert report to CSV format"""
-        
+
         # This is a simplified CSV conversion
         # In practice, you might want to use pandas for better CSV handling
-        
+
         csv_data = {}
-        
+
         # Convert run summaries to CSV
-        run_summaries = report.get('historical_data', {}).get('run_summaries', [])
+        run_summaries = report.get("historical_data", {}).get("run_summaries", [])
         if run_summaries:
             headers = list(run_summaries[0].keys())
-            csv_lines = [','.join(headers)]
-            
+            csv_lines = [",".join(headers)]
+
             for run in run_summaries:
-                row = [str(run.get(header, '')) for header in headers]
-                csv_lines.append(','.join(row))
-            
-            csv_data['run_summaries.csv'] = '\n'.join(csv_lines)
-        
+                row = [str(run.get(header, "")) for header in headers]
+                csv_lines.append(",".join(row))
+
+            csv_data["run_summaries.csv"] = "\n".join(csv_lines)
+
         # Convert summary stats to CSV
-        summary_stats = report.get('summary_statistics', {})
-        if summary_stats and 'error' not in summary_stats:
-            csv_lines = ['metric,value']
+        summary_stats = report.get("summary_statistics", {})
+        if summary_stats and "error" not in summary_stats:
+            csv_lines = ["metric,value"]
             for key, value in summary_stats.items():
-                csv_lines.append(f'{key},{value}')
-            
-            csv_data['summary_statistics.csv'] = '\n'.join(csv_lines)
-        
+                csv_lines.append(f"{key},{value}")
+
+            csv_data["summary_statistics.csv"] = "\n".join(csv_lines)
+
         return csv_data

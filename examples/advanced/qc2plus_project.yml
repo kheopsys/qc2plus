@@ -1,6 +1,6 @@
-name: advanced_example
+name: advanced
 version: 1.0.0
-profile: advanced_example
+profile: advanced
 
 model-paths: ["models"]
 target-path: "target"

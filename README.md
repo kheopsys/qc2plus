@@ -224,8 +224,40 @@ qc2plus run --threads 4
 # Production run with fail-fast
 qc2plus run --target prod --fail-fast
 ```
-
 ---
+## 🏁 Quick Start With Docker 
+
+### 1. Clone the repository
+git clone https://github.com/YOUR_USERNAME/qc2plus.git
+cd qc2plus
+
+### 2. Start all services
+docker-compose up -d
+
+#### Expected output:
+```bash
+ Container qc2plus-postgres         Started
+ Container qc2plus-postgres-results Started
+ Container qc2plus-runner           Started
+```
+### 3. Verify services are running
+docker-compose ps
+
+### 4. Access the QC2Plus container
+docker exec -it qc2plus-runner bash
+
+### 5. Inside the container, run quality checks
+cd examples/advanced
+qc2plus run --models customers --target demo
+
+
+### 6. View results in PostgreSQL
+docker exec -it qc2plus-postgres-results psql -U qc2plus -d qc2plus_results \
+  -c "SELECT model_name, test_type, status, failed_rows 
+      FROM quality_test_results 
+      ORDER BY execution_time DESC 
+      LIMIT 10;"
+
 
 ## 📚 Documentation
 
