@@ -208,7 +208,7 @@ __marimo__/
 # CRITICAL: Credentials and Secrets
 # ========================================
 .env
-.env.*
+
 secrets.yml
 *.json
 !example*.json
