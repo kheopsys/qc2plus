@@ -269,17 +269,9 @@ docker exec -it qc2plus-postgres-results psql -U qc2plus -d qc2plus_results \
 ### 📖 Complete Guides
 
 - **[QC2PLUS Documentation](QC2PLUS_DOCUMENTATION.md)** - Complete parameter reference
-- **[User Guide](https://qc2plus.readthedocs.io/user-guide)** - Comprehensive tutorials
 - **[Examples](https://github.com/qc2plus/examples)** - Real-world use cases
-- **[Contributing](CONTRIBUTING.md)** - Development guide
 
-### 🎓 Tutorials
 
-- [Getting Started (5 min)](https://qc2plus.readthedocs.io/quickstart)
-- [Level 1 Tests Deep Dive](https://qc2plus.readthedocs.io/level1-guide)
-- [Level 2 ML Analyzers](https://qc2plus.readthedocs.io/level2-guide)
-- [Setting Up Alerts](https://qc2plus.readthedocs.io/alerting)
-- [Power BI Integration](https://qc2plus.readthedocs.io/powerbi)
 
 ---
 
