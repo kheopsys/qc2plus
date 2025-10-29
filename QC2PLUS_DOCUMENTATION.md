@@ -303,7 +303,7 @@ WHERE column_name IS NOT NULL
 
 ---
 
-### foreign_key
+### relationship
 
 Checks referential integrity between tables.
 
@@ -318,7 +318,7 @@ Checks referential integrity between tables.
 
 **Example:**
 ```yaml
-- foreign_key:
+- relationship:
     column_name: customer_id
     reference_table: customers
     reference_column: id
@@ -917,7 +917,7 @@ Initialize a new QC2Plus project.
 
 **Usage:**
 ```bash
-qc2plus init PROJECT_NAME [OPTIONS]
+qc2plus init PROJECT_NAME 
 ```
 
 **Arguments:**
@@ -943,7 +943,7 @@ Run quality tests.
 
 **Usage:**
 ```bash
-qc2plus run [OPTIONS]
+qc2plus run 
 ```
 
 **Options:**
@@ -982,7 +982,7 @@ Test database connection.
 
 **Usage:**
 ```bash
-qc2plus test-connection [OPTIONS]
+qc2plus test-connection 
 ```
 
 **Options:**
@@ -1000,11 +1000,6 @@ qc2plus test-connection --target prod
 
 List all models in the project.
 
-**Usage:**
-```bash
-qc2plus list-models [OPTIONS]
-```
-
 **Options:**
 - `--output-format` : str, default='table'
   - Output format: 'table', 'json', 'yaml'
@@ -1015,21 +1010,6 @@ qc2plus list-models
 qc2plus list-models --output-format json
 ```
 
----
-
-### qc2plus validate
-
-Validate project configuration.
-
-**Usage:**
-```bash
-qc2plus validate
-```
-
-**Example:**
-```bash
-qc2plus validate
-```
 
 ---
 
@@ -1037,21 +1017,10 @@ qc2plus validate
 
 Compile tests to SQL without executing.
 
-**Usage:**
-```bash
-qc2plus compile [OPTIONS]
-```
-
-**Options:**
-- `--models` : str, optional
-  - Comma-separated model names
-- `--target` : str, default='dev'
-  - Target environment
-
 **Example:**
 ```bash
 qc2plus compile
-qc2plus compile --models customers --target prod
+
 ```
 
 ---
@@ -1216,4 +1185,4 @@ qc2plus run --target prod --threads 4 --fail-fast
 
 ---
 
-This documentation is comprehensive and follows the scikit-learn style. All parameters are documented with types, defaults, ranges, and examples.
+This documentation is comprehensive. All parameters are documented with types, defaults, ranges, and examples.

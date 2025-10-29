@@ -27,7 +27,7 @@ QC2Plus is an open-source Python framework for **automated data quality testing*
 ### Two-Level Quality Approach
 
 **Level 1: SQL-Based Validation** 🔍
-- Business rules (unique, not_null, foreign keys)
+- Business rules (unique, not_null, relationship)
 - Format validation (email, phone, dates)
 - Statistical thresholds (detect metric anomalies)
 - Custom SQL tests
