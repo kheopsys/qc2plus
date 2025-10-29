@@ -226,6 +226,7 @@ venv/
 examples/**/__pycache__/
 examples/**/venv/
 examples/**/.venv/  
+
 # Ignore specific example folders
 examples/student-datamart/
 examples/test_level_2/
@@ -236,7 +237,7 @@ examples/test_level_2/=3.0.0
 à faire.md
 qc2plus-internal.egg-info/
 bugs.md
-
+prompts/
 
 # ========================================
 # Docker
@@ -244,3 +245,6 @@ bugs.md
 docker-compose.override.yml
 .dockerignore
 .secrets.baseline
+
+# Prompts directory
+prompts/
