@@ -605,10 +605,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgments
-
-- Inspired by [dbt](https://www.getdbt.com/) for the CLI approach
-- Built with [SQLAlchemy](https://www.sqlalchemy.org/), [scikit-learn](https://scikit-learn.org/), [pandas](https://pandas.pydata.org/)
 ## 🙏 Contributors & Acknowledgments
 
 ### Main Contributors
@@ -625,6 +621,7 @@ This project is maintained by:
       </a>
       <br />
       <sub>Creator & Maintainer</sub>
+       <br />
       🤖 💻 📊
     </td>
     <td align="center">
