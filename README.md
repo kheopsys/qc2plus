@@ -330,9 +330,6 @@ alerting:
       - alerts@company.com
 ```
 
-**Alert Example:**
-
-<img src="https://raw.githubusercontent.com/qc2plus/assets/main/slack-alert-example.png" alt="Slack Alert" width="500"/>
 
 ---
 
@@ -612,8 +609,63 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - Inspired by [dbt](https://www.getdbt.com/) for the CLI approach
 - Built with [SQLAlchemy](https://www.sqlalchemy.org/), [scikit-learn](https://scikit-learn.org/), [pandas](https://pandas.pydata.org/)
-- Thanks to our [contributors](https://github.com/qc2plus/qc2plus/graphs/contributors)
+## 🙏 Contributors & Acknowledgments
 
+### Main Contributors
+
+This project is maintained by:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/IkramKheopsys">
+        <img src="https://github.com/IkramKheopsys.png" width="100px;" alt="Your Name"/>
+        <br />
+        <sub><b>Ikrame Ettiache</b></sub>
+      </a>
+      <br />
+      <sub>Creator & Maintainer</sub>
+      🤖 💻 📊
+    </td>
+    <td align="center">
+      <a href="https://github.com/agambo-kheopsys">
+        <img src="https://github.com/agambo-kheopsys.png" width="100px;" alt=""/>
+        <br />
+        <sub><b>Abdoul Raoufou Gambo</b></sub>
+      </a>
+      <br />
+      <sub>Creator & Maintainer</sub>
+      <br />
+      💻 🐛 📖
+    </td>
+    <td align="center">
+      <a href="https://github.com/ysokri">
+        <img src="https://github.com/ysokri.png" width="100px;" alt=""/>
+        <br />
+        <sub><b>Yasser Sokri</b></sub>
+      </a>
+      <br />
+      <sub>Creator & Maintainer</sub>
+      <br />
+      🤖 💻 📊
+    </td>
+  </tr>
+</table>
+
+
+### Special Thanks
+
+- Inspired by [dbt](https://www.getdbt.com/) for the elegant CLI approach
+- Built with [SQLAlchemy](https://www.sqlalchemy.org/), [scikit-learn](https://scikit-learn.org/), [pandas](https://pandas.pydata.org/)
+- Thanks to everyone who reported bugs and suggested features!
+
+### Sponsor
+
+If QC2Plus helps your organization, consider:
+- ⭐ [Starring the repo](https://github.com/YOUR_USERNAME/qc2plus)
+- 🐛 [Reporting bugs](https://github.com/YOUR_USERNAME/qc2plus/issues)
+- 💡 [Suggesting features](https://github.com/YOUR_USERNAME/qc2plus/issues/new)
+- 🤝 [Contributing code](CONTRIBUTING.md)
 ---
 
 ## 📧 Support & Community
