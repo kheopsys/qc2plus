@@ -70,7 +70,7 @@ QC2Plus is an open-source Python framework for **automated data quality testing*
 
 **Level 1 Tests** (8 built-in types):
 - `unique`, `not_null`, `accepted_values`
-- `foreign_key`, `range_check`
+- `relationship`, `range_check`
 - `email_format`, `future_date`
 - `statistical_threshold` (ML-powered)
 
@@ -292,13 +292,13 @@ docker exec -it qc2plus-postgres-results psql -U qc2plus -d qc2plus_results \
 | `unique` | Primary keys, unique identifiers | `customer_id`, `email` |
 | `not_null` | Required fields | `email`, `created_at` |
 | `email_format` | Email validation | Email addresses |
-| `foreign_key` | Referential integrity | `customer_id` → `customers.id` |
+| `relationship` | Referential integrity | `customer_id` → `customers.id` |
 | `accepted_values` | Enum/status fields | `status` in ['active', 'inactive'] |
 | `range_check` | Numeric boundaries | `age` between 0 and 120 |
 | `future_date` | Date validation | Birth dates, creation dates |
 | `statistical_threshold` | Metric anomalies | Daily registrations, revenue |
 
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for complete parameter reference.
+See [QC2PLUS_DOCUMENTATION.md](QC2PLUS_DOCUMENTATION.md) for complete parameter reference.
 
 ### Level 2 Analyzers
 
@@ -417,7 +417,7 @@ models:
         - not_null:
             column_name: order_id
             severity: critical
-        - foreign_key:
+        - relationship:
             column_name: customer_id
             reference_table: customers
             reference_column: id
