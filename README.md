@@ -229,7 +229,7 @@ qc2plus run --target prod --fail-fast
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/qc2plus.git
+git clone https://github.com/kheopsys/qc2plus
 cd qc2plus
 ```
 ### 2. Start all services
@@ -268,7 +268,7 @@ docker exec -it qc2plus-postgres-results psql -U qc2plus -d qc2plus_results \
 
 ### 📖 Complete Guides
 
-- **[QC2PLUS Documentation](QC2PLUS_DOCUMENTATION.md)** - Complete parameter reference
+- **[QC2PLUS Documentation](https://github.com/kheopsys/qc2plus/QC2PLUS_DOCUMENTATION.md)** - Complete parameter reference
 - **[Examples](https://github.com/qc2plus/examples)** - Real-world use cases
 
 
@@ -290,7 +290,7 @@ docker exec -it qc2plus-postgres-results psql -U qc2plus -d qc2plus_results \
 | `future_date` | Date validation | Birth dates, creation dates |
 | `statistical_threshold` | Metric anomalies | Daily registrations, revenue |
 
-See [QC2PLUS_DOCUMENTATION.md](QC2PLUS_DOCUMENTATION.md) for complete parameter reference.
+See [QC2PLUS_DOCUMENTATION.md](https://github.com/qc2plus/QC2PLUS_DOCUMENTATION.md) for complete parameter reference.
 
 ### Level 2 Analyzers
 
@@ -390,7 +390,6 @@ WHERE detection_time >= CURRENT_DATE - INTERVAL '7 days'
 ORDER BY anomaly_score DESC;
 ```
 
-**Power BI Templates**: Download ready-to-use dashboards from [qc2plus/powerbi-templates](https://github.com/qc2plus/powerbi-templates)
 
 ---
 
@@ -659,15 +658,15 @@ This project is maintained by:
 ### Sponsor
 
 If QC2Plus helps your organization, consider:
-- ⭐ [Starring the repo](https://github.com/YOUR_USERNAME/qc2plus)
-- 🐛 [Reporting bugs](https://github.com/YOUR_USERNAME/qc2plus/issues)
-- 💡 [Suggesting features](https://github.com/YOUR_USERNAME/qc2plus/issues/new)
-- 🤝 [Contributing code](CONTRIBUTING.md)
+- ⭐ [Starring the repo](https://github.com/kheopsys/qc2plus)
+- 🐛 [Reporting bugs](https://github.com/kheopsys/qc2plus/issues)
+- 💡 [Suggesting features](https://github.com/kheopsys/qc2plus/issues/new)
+- 🤝 [Contributing code](https://github.com/kheopsys/qc2plus/CONTRIBUTING.md)
 ---
 
 ## 📧 Support & Community
 
-- 📖 **Documentation**: https://qc2plus.readthedocs.io
+- 📖 **Documentation**: https://github.com/kheopsys/qc2plus/docu
 - 🐛 **Issues**: [GitHub Issues](https://github.com/qc2plus/qc2plus/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/qc2plus/qc2plus/discussions)
 - 🐦 **Twitter**: [@qc2plus](https://twitter.com/qc2plus)
