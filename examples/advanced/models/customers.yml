@@ -1,0 +1,90 @@
+models:
+  - name: customers
+    description: "Comprehensive data quality plan for the customers model"
+    
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: email
+            severity: critical
+           
+        - email_format:
+            column_name: email
+            severity: high
+
+        - range_check:
+            column_name: age
+            min_value: 18
+            max_value: 120
+            severity: medium
+
+        - not_null:
+            column_name: first_name
+            severity: critical
+
+        - not_null:
+            column_name: country
+            severity: high
+
+
+        - not_null:
+            column_name: created_at
+            severity: medium
+
+        - future_date:
+            column_name: created_at
+            severity: medium
+
+        - freshness:
+            column_name: created_at
+            max_age_days: 30
+            severity: high
+
+        - accepted_values:
+            column_name: status
+            accepted_values: ['active', 'inactive']
+            severity: critical
+
+        - accepted_values:
+            column_name: country
+            accepted_values: ['USA', 'UK', 'Canada']
+            severity: medium
+
+        - statistical_threshold:
+            metric: count
+            threshold_type: relative
+            threshold_value: 2.0
+            window_days: 30
+            severity: medium
+
+        - custom_sql:
+            custom_sql: |
+              SELECT 
+                'inactive_ratio_limit' AS column_name,
+                COUNT(*) AS failed_rows,
+                (SELECT COUNT(*) FROM demo.customers) AS total_rows,
+                'Inactive users exceed 10%' AS message
+              FROM demo.customers
+              WHERE status = 'inactive'
+              HAVING COUNT(*) > 0.1 * (SELECT COUNT(*) FROM demo.customers)
+            severity: high
+
+      level2:
+        distribution_analysis:
+            segments: [country, status]
+            metrics: [count]
+            date_column: created_at
+            reference_period: 30
+            comparison_period: 7
+            behavior_change_threshold: 80
+            severity: medium
+            
+        temporal_analysis:
+            date_column: created_at
+            metrics: [count]
+            seasonality_check: true
+            anomaly_detection: true
+            window_days: 30
+            frequency: daily
+            severity: medium
+

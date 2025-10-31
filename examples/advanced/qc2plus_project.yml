@@ -1,0 +1,31 @@
+name: advanced
+version: 1.0.0
+profile: advanced
+
+model-paths: ["models"]
+target-path: "target"
+log-path: "logs"
+
+
+alerting:
+  enabled_channels: ["slack", "email"] 
+  
+  slack:
+    webhook_url: ${"SLACK_WEBHOOK_URL"}
+    
+  email:
+    smtp_server: "smtp.gmail.com"      
+    smtp_port: 587
+    username: ${"EMAIL_USERNAME"}
+    password: ${"EMAIL_PASSWORD"}
+    from_email: ${"EMAIL_FROM"}
+    to_emails:
+      - ${"EMAIL_TO_1"}
+      - ${"EMAIL_TO_2"} 
+
+
+
+
+
+
+

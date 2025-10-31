@@ -1,0 +1,76 @@
+models:
+  - name: customer_datamart
+    description: "Data quality checks on the 90-day customer performance mart"
+    
+    sample:
+      method: random
+      percentage: 0.2
+
+    qc2plus_tests:
+      level1:
+        - unique:
+            column_name: customer_id
+            severity: critical
+
+        - not_null:
+            column_name: lifetime_value
+            severity: critical
+        - not_null:
+            column_name: order_frequency
+            severity: critical
+        - not_null:
+            column_name: customer_segment
+            severity: critical
+
+        - range_check:
+            column_name: lifetime_value
+            min_value: 0
+            max_value: 1000000
+            severity: medium
+
+        - range_check:
+            column_name: order_frequency
+            min_value: 1
+            severity: medium
+
+        - accepted_values:
+            column_name: customer_segment
+            accepted_values: ['Mono-buyer', 'Regular-buyer', 'VIP-buyer', 'Not-segmented']
+            severity: critical
+
+        - accepted_benchmark_values:
+            column_name: customer_segment
+            benchmark_values:
+              'Mono-buyer': 50
+              'Regular-buyer': 40
+              'VIP-buyer': 10
+            threshold: 0.2
+            severity: critical
+
+        - range_check:
+            column_name: lifetime_value
+            max_value: 500000
+            severity: low
+        - custom_sql:
+            severity: high
+            custom_sql: |
+              -- Vérifie qu'il n'y a pas plus de 10 clients VIP -- VALABLE SUR POSTGRESQL 
+              SELECT
+                'VIP_limit' AS column_name,
+                CASE WHEN COUNT(*) > 10 THEN 1 ELSE 0 END AS failed_rows,
+                COUNT(*) AS total_rows,
+                'Too many VIP buyers (>10)' AS message,
+                STRING_AGG(CAST(customer_id AS TEXT), ', ') AS invalid_examples
+              FROM demo.customer_datamart
+              WHERE customer_segment = 'VIP-buyer'
+              HAVING COUNT(*) > 10
+
+
+      level2:
+        distribution_analysis:
+            segments: [country]
+            metrics: [count, avg_lifetime_value]
+            reference_period: 90
+            comparison_period: 30
+            behavior_change_threshold: 80
+            severity: medium

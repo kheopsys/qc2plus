@@ -1,0 +1,71 @@
+models:
+  - name: orders
+    description: "Comprehensive QC2+ plan for the Orders model with Level 1 & 2 checks"
+
+    qc2plus_tests:
+      level1:
+
+        - relationship:
+            column_name: customer_id
+            reference_table: customers
+            reference_column: customer_id
+            severity: critical
+            explanation: "Chaque ordre doit être liée à un customer existant"
+
+        - unique:
+            column_name: order_id
+            severity: critical
+
+        - not_null:
+            column_name: customer_id
+            severity: critical
+
+        - not_null:
+            column_name: order_date
+            severity: critical
+
+        - not_null:
+            column_name: total_amount
+            severity: critical
+
+        - future_date:
+            column_name: order_date
+            severity: high
+
+        - freshness:
+            column_name: created_at
+            max_age_days: 2
+            severity: high
+
+        - accepted_values:
+            column_name: status
+            accepted_values: ['pending', 'completed', 'cancelled']
+            severity: medium
+
+        - range_check:
+            column_name: total_amount
+            min_value: 0
+            max_value: 10000
+            severity: medium
+
+        - range_check:
+            column_name: order_date
+            min_value: '2020-01-01'
+            severity: low
+
+        - statistical_threshold:
+            metric: count
+            threshold_type: stddev
+            threshold_value: 2.0
+            window_days: 30
+            severity: critical
+
+
+      level2:
+        distribution_analysis:
+            segments: [status]
+            metrics: [count, avg_total_amount, sum_total_amount]
+            reference_period: 90
+            comparison_period: 30   
+            date_column: order_date
+

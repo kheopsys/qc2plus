@@ -1,0 +1,23 @@
+advanced:
+  target: dev
+  outputs:
+    dev:
+      data_source:
+        type: postgresql
+        host: postgres-data 
+        port: 5432
+        user: qc2plus
+        password: qc2plus_password
+        dbname: qc2plus_demo
+        schema: demo
+
+      quality_output:
+        type: postgresql 
+        host: postgres-results
+        port: 5432
+        user: qc2plus
+        password: qc2plus_password
+        dbname: qc2plus_results
+        schema: qc2plus_results
+
+
