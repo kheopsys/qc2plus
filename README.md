@@ -662,11 +662,13 @@ If QC2Plus helps your organization, consider:
 
 ## 📧 Support & Community
 
-- 📖 **Documentation**: - **[qc2plus documentation](https://github.com/kheopsys/qc2plus/blob/main/doc.md)** 
+## 📧 Support & Community
+
+- 📖 **Documentation**: [QC2plus documentation](https://github.com/kheopsys/qc2plus/blob/main/doc.md)
 - 🐛 **Issues**: [GitHub Issues](https://github.com/kheopsys/qc2plus/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/kheopsys/qc2plus/discussions)
 - 💼 **LinkedIn**: [QC2Plus](https://linkedin.com/company/kheopsys)
-- **Email** : qc2plus@kheopsys.com
+- ✉️ **Email**: qc2plus@kheopsys.com
 ---
 
 <div align="center">
