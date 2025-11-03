@@ -62,8 +62,7 @@ QC2Plus is an open-source Python framework for **automated data quality testing*
 | Database | Support Level | Installation |
 |----------|--------------|--------------|
 | PostgreSQL | ✅ Stable | Included |
-| Snowflake | ✅ Stable | `pip install qc2plus[snowflake]` |
-| BigQuery | ✅ Stable | `pip install qc2plus[bigquery]` |
+| BigQuery | ✅ Stable | Included  |
 | Redshift | ⚠️ Beta | `pip install qc2plus[redshift]` |
 
 ### 📊 Comprehensive Testing
