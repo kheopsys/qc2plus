@@ -62,9 +62,3 @@ models:
             explanation: "Est-ce que mes utilisateurs se comportent normalement au fil du temps?
                           Pour chaque utilisateur, surveille : son NOMBRE de sessions et son TOTAL de pages vues"
 
-        correlation_analysis:
-            variables: [page_views, session_date]
-            expected_correlation: 0.0
-            threshold: 0.5
-            severity: low
-            explanation: "Est-ce que Le nombre de pages vues est corrélé avec la date de session"

@@ -1,8 +1,0 @@
-log-path: logs
-model-paths:
-- models
-name: project
-profile: project
-target-path: target
-vars: {}
-version: 1.0.0
