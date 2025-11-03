@@ -50,4 +50,12 @@ models:
             frequency: daily
             severity: medium
             explanation: "Surveillance quotidienne du NOMBRE de sessions et du TOTAL de pages vues pour détecter les anomalies"
+        distribution_analysis:
+          segments: [user_id]
+          metrics: [avg_page_views]
+          date_column: session_date
+          reference_period: 7
+          comparison_period: 1
+          behavior_change_threshold: 25  # déclenchement pour +25% variation
+
 

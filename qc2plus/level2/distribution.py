@@ -79,7 +79,7 @@ class DistributionAnalyzer:
                 segments,
                 metrics,
                 date_column,
-                comparison_period,
+                reference_period,
                 comparison_period,
                 "comparison",
             )
@@ -235,7 +235,7 @@ class DistributionAnalyzer:
         cast_date_col = funcs["cast_date"](date_column)
 
         if period_type == "comparison":
-            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,reference_period)}"
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,comparison_period)}"
         else:  # reference
             total_days = comparison_period + reference_period
             date_condition = f"""
@@ -254,7 +254,8 @@ class DistributionAnalyzer:
             ORDER BY {', '.join(segments)}
         """
 
-        data = self.connection_manager.execute_query(query)
+        print(f"\n[DEBUG] Period type: {period_type}")
+        print(f"[DEBUG] Date condition used for {period_type}: {date_condition}\n")
 
         return self.connection_manager.execute_query(query)
 
@@ -438,6 +439,7 @@ class DistributionAnalyzer:
                 days,
                 "comparison",
             )
+            
 
             if data.empty:
                 return {"error": "No data available"}
@@ -481,7 +483,7 @@ class DistributionAnalyzer:
         cast_date_col = funcs["cast_date"](date_column)
 
         if period_type == "comparison":
-            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,reference_period)}"
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,comparison_period)}"
         else:  # reference
             total_days = comparison_period + reference_period
             date_condition = f"""

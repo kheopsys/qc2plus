@@ -65,9 +65,10 @@ models:
         distribution_analysis:
             segments: [status]
             metrics: [count, avg_total_amount, sum_total_amount]
-            reference_period: 90
-            comparison_period: 30   
+            reference_period: 7
+            comparison_period: 2   
             date_column: order_date
+
         temporal_analysis:
           date_column: order_date
           metrics: [count, sum_total_amount]
