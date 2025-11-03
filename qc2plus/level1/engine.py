@@ -52,9 +52,7 @@ class Level1Engine:
 
         for test_config in level1_tests:
             for test_type, test_params in test_config.items():
-                test_name = f"{test_type}_{
-                    test_params.get(
-                        'column_name', 'test')}"
+                test_name = f"{test_type}_{test_params.get('column_name', 'test')}"
 
                 try:
                     result = self._run_single_test(
@@ -328,8 +326,7 @@ class Level1Engine:
             valid_severities = ["critical", "high", "medium", "low"]
             if test_params["severity"] not in valid_severities:
                 issues.append(
-                    f"Invalid severity: {
-                        test_params['severity']}. Must be one of {valid_severities}"
+                    f"Invalid severity: {test_params['severity']}. Must be one of {valid_severities}"
                 )
 
         # Test-specific validations
@@ -411,54 +408,15 @@ class Level1Engine:
         """Generate human-readable explanation for a test"""
 
         explanations = {
-            "unique": f"Verifies that column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' contains only unique values. Duplicates may indicate data entry errors or process issues.",
-            "not_null": f"Verifies that column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' contains no empty (NULL) values. Missing values can compromise data integrity.",
-            "email_format": f"Verifies that column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' contains valid email addresses in name@domain.com format. Values like 'Lyon' or 'Paris' are not valid emails.",
-            "relationship": f"Verifies referential integrity between column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' and reference table '{
-                test_params.get(
-                    'reference_table',
-                    'N/A')}'. Each value must exist in the reference table.",
-            "future_date": f"Verifies that column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' does not contain future dates. Future dates may indicate data entry errors or synchronization issues.",
-            "accepted_values": f"Verifies that column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' contains only authorized values. Non-compliant values may indicate data entry errors.",
-            "statistical_threshold": f"Verifies that metric '{
-                test_params.get(
-                    'metric',
-                    'N/A')}' respects statistical thresholds based on the last {
-                test_params.get(
-                    'window_days',
-                    30)} days of historical data.",
-            "accepted_benchmark_values": f"Verifies that the distribution of values in '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' matches expected reference percentages with a tolerance of {
-                test_params.get(
-                    'threshold',
-                    0) * 100}%.",
-            "freshness": f"Verifies that data in column '{
-                test_params.get(
-                    'column_name',
-                    'N/A')}' is not too old (more than {
-                test_params.get(
-                    'max_age_days',
-                    'N/A')} days).",
+            "unique": f"Verifies that column '{test_params.get('column_name','N/A')}' contains only unique values. Duplicates may indicate data entry errors or process issues.",
+            "not_null": f"Verifies that column '{test_params.get('column_name','N/A')}' contains no empty (NULL) values. Missing values can compromise data integrity.",
+            "email_format": f"Verifies that column '{test_params.get('column_name','N/A')}' contains valid email addresses in name@domain.com format. Values like 'Lyon' or 'Paris' are not valid emails.",
+            "relationship": f"Verifies referential integrity between column '{test_params.get('column_name','N/A')}' and reference table '{test_params.get('reference_table','N/A')}'. Each value must exist in the reference table.",
+            "future_date": f"Verifies that column '{test_params.get('column_name','N/A')}' does not contain future dates. Future dates may indicate data entry errors or synchronization issues.",
+            "accepted_values": f"Verifies that column '{test_params.get('column_name','N/A')}' contains only authorized values. Non-compliant values may indicate data entry errors.",
+            "statistical_threshold": f"Verifies that metric '{test_params.get('metric','N/A')}' respects statistical thresholds based on the last {test_params.get('window_days',30)} days of historical data.",
+            "accepted_benchmark_values": f"Verifies that the distribution of values in '{test_params.get('column_name','N/A')}' matches expected reference percentages with a tolerance of {test_params.get('threshold',0) * 100}%.",
+            "freshness": f"Verifies that data in column '{test_params.get('column_name','N/A')}' is not too old (more than {test_params.get('max_age_days','N/A')} days).",
         }
 
         return explanations.get(
@@ -515,19 +473,14 @@ class Level1Engine:
                 ):
                     for _, row in df.head(max_examples).iterrows():
                         examples.append(
-                            f"{
-                                row['value']}: {
-                                row['actual_pct']:.1f}% (attendu: {
-                                row['expected_pct']:.1f}%)"
+                            f"{row['value']}: {row['actual_pct']:.1f}% (attendu: {row['expected_pct']:.1f}%)"
                         )
 
             elif test_type == "statistical_threshold":
                 if "current_value" in df.columns and "threshold_value" in df.columns:
                     row = df.iloc[0]
                     examples.append(
-                        f"Valeur actuelle: {
-                            row['current_value']}, Seuil: {
-                            row['threshold_value']}"
+                        f"Valeur actuelle: {row['current_value']}, Seuil: {row['threshold_value']}"
                     )
 
         except Exception as e:

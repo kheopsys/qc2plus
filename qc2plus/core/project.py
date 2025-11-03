@@ -304,9 +304,7 @@ For more information, visit: https://github.com/qc2plus/qc2plus
             level1_tests = model_config.get("qc2plus_tests", {}).get("level1", [])
             for test_config in level1_tests:
                 for test_type, test_params in test_config.items():
-                    test_name = f"{test_type}_{
-                        test_params.get(
-                            'column_name', 'test')}"
+                    test_name = f"{test_type}_{test_params.get('column_name', 'test')}"
                     try:
                         # This is a simplified compilation - full compilation
                         # needs DB connection

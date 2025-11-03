@@ -6,7 +6,7 @@ A comprehensive framework for automated data quality control with two levels:
 - Level 2: ML-powered anomaly detection (correlations, temporal patterns, distributions)
 """
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 __author__ = "QC2Plus Team"
 __email__ = "contact-qc2plus@kheopsys.com"
 

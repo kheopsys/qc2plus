@@ -7,7 +7,7 @@
 
 set -e  # Exit on error
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'

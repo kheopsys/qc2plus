@@ -394,9 +394,7 @@ class AnomalyFilter:
                     {
                         "should_filter": True,
                         "reason": "seasonal_and_correlated",
-                        "explanation": f"Variation during {
-                            seasonal_info['period_name']} with {
-                            correlation_info['consistency_score']:.0%} indicator consistency",
+                        "explanation": f"Variation during {seasonal_info['period_name']} with {correlation_info['consistency_score']:.0%} indicator consistency",
                         "details": {
                             "seasonal": seasonal_info,
                             "correlations": correlation_info,
@@ -411,8 +409,7 @@ class AnomalyFilter:
                     {
                         "should_filter": True,
                         "reason": "high_seasonality",
-                        "explanation": f"Expected variation during {
-                            seasonal_info['period_name']}",
+                        "explanation": f"Expected variation during {seasonal_info['period_name']}",
                         "details": {"seasonal": seasonal_info},
                     }
                 )
@@ -424,9 +421,7 @@ class AnomalyFilter:
                     {
                         "should_filter": True,
                         "reason": "high_correlation",
-                        "explanation": f"Systematic {
-                            correlation_info['pattern']} across {
-                            correlation_info['group']} indicators",
+                        "explanation": f"Systematic {correlation_info['pattern']} across {correlation_info['group']} indicators",
                         "details": {"correlations": correlation_info},
                     }
                 )

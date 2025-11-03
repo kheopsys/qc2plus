@@ -34,6 +34,7 @@ def cli():
 def init(project_name: str, profile_template: str):
     """Initialize a new 2QC+ project"""
     try:
+        project = QC2PlusProject.init_project(project_name, profile_template)
         click.echo(f"✅ Successfully initialized 2QC+ project: {project_name}")
         click.echo(f"📁 Project created at: {os.path.abspath(project_name)}")
         click.echo(

@@ -4,7 +4,7 @@
 
     [project]
     name = "qc2plus"
-    version = "1.0.4"
+    version = "1.0.5"
     description = "Data Quality Automation Framework with ML-powered anomaly detection"
     readme = "README.md"
     requires-python = ">=3.9"

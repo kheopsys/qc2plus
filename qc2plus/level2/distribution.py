@@ -104,9 +104,7 @@ class DistributionAnalyzer:
                                 "comparison_avg": len(comparison_data),
                                 "percent_change": 0,
                                 "severity": "critical",
-                                "description": f"No data available in one or both periods (reference: {
-                                    len(reference_data)} rows, comparison: {
-                                    len(comparison_data)} rows)",
+                                "description": f"No data available in one or both periods (reference: {len(reference_data)} rows, comparison: {len(comparison_data)} rows)",
                             }
                         ],
                     },
@@ -237,10 +235,7 @@ class DistributionAnalyzer:
         cast_date_col = funcs["cast_date"](date_column)
 
         if period_type == "comparison":
-            date_condition = f"{cast_date_col} >= {
-                funcs['date_sub'](
-                    current_date_expr,
-                    reference_period)}"
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,reference_period)}"
         else:  # reference
             total_days = comparison_period + reference_period
             date_condition = f"""
@@ -341,17 +336,13 @@ class DistributionAnalyzer:
                             "severity": (
                                 "critical" if abs(share_change) > 20 else "high"
                             ),
-                            "description": f"{segment_value} share changed from {
-                                ref_share:.1f}% to {
-                                comp_share:.1f}% ({
-                                    share_change:+.1f} points)",
+                            "description": f"{segment_value} share changed from {ref_share:.1f}% to {comp_share:.1f}% ({share_change:+.1f} points)",
                         }
                     )
 
         except Exception as e:
             logging.warning(
-                f"Share shift detection failed for {segment}/{metric}: {
-                    str(e)}"
+                f"Share shift detection failed for {segment}/{metric}: {str(e)}"
             )
 
         return anomalies
@@ -398,17 +389,13 @@ class DistributionAnalyzer:
                                 "severity": (
                                     "critical" if abs(pct_change) > 50 else "high"
                                 ),
-                                "description": f"{segment_value} {metric} changed from {
-                                    ref_avg:.0f} to {
-                                    comp_avg:.0f} ({
-                                    pct_change:+.1f}%)",
+                                "description": f"{segment_value} {metric} changed from {ref_avg:.0f} to {comp_avg:.0f} ({pct_change:+.1f}%)",
                             }
                         )
 
         except Exception as e:
             logging.warning(
-                f"Behavior anomaly detection failed for {segment}/{metric}: {
-                    str(e)}"
+                f"Behavior anomaly detection failed for {segment}/{metric}: {str(e)}"
             )
 
         return anomalies
@@ -494,10 +481,7 @@ class DistributionAnalyzer:
         cast_date_col = funcs["cast_date"](date_column)
 
         if period_type == "comparison":
-            date_condition = f"{cast_date_col} >= {
-                funcs['date_sub'](
-                    current_date_expr,
-                    reference_period)}"
+            date_condition = f"{cast_date_col} >= {funcs['date_sub'](current_date_expr,reference_period)}"
         else:  # reference
             total_days = comparison_period + reference_period
             date_condition = f"""

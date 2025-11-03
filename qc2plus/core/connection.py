@@ -225,8 +225,7 @@ class ConnectionManager:
                 explanation TEXT,
                 examples TEXT,
                 query TEXT
-            )
-        """
+            ) """
 
         # Table 2: quality_run_summary
         quality_run_summary_sql = f"""
@@ -242,8 +241,7 @@ class ConnectionManager:
                 critical_failures INTEGER,
                 execution_duration_seconds INTEGER,
                 status VARCHAR(20)
-            )
-        """
+            ) """
 
         # Table 3: quality_anomalies
         quality_anomalies_sql = f"""
@@ -258,8 +256,7 @@ class ConnectionManager:
                 detection_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 severity VARCHAR(20),
                 target_environment VARCHAR(50)
-            )
-        """
+            ) """
 
         # Adapt SQL for BigQuery
         if self.quality_db_type == "bigquery":

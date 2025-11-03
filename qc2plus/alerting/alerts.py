@@ -251,8 +251,7 @@ class AlertManager:
             msg = MIMEMultipart("alternative")
 
             if individual:
-                subject = f"🚨 CRITICAL: 2QC+ Test Failure - {
-                    alert_data['model']}"
+                subject = f"🚨 CRITICAL: 2QC+ Test Failure - {alert_data['model']}"
                 html_content = self._create_individual_email_html(alert_data)
             else:
                 severity_emoji = {
@@ -261,9 +260,7 @@ class AlertManager:
                     "medium": "📊",
                 }
                 emoji = severity_emoji.get(alert_data["severity"], "📊")
-                subject = f"{emoji} 2QC+ Quality Report - {
-                    alert_data['target']} ({
-                    alert_data['failed_tests']} failures)"
+                subject = f"{emoji} 2QC+ Quality Report - {alert_data['target']} ({alert_data['failed_tests']} failures)"
                 html_content = self._create_summary_email_html(alert_data)
 
             msg["Subject"] = subject
@@ -281,9 +278,7 @@ class AlertManager:
                 server.send_message(msg)
 
             logging.info(
-                f"Email alert sent successfully ({
-                    'individual' if individual else 'summary'})"
-            )
+                f"Email alert sent successfully ({'individual' if individual else 'summary'})")
 
         except Exception as e:
             logging.error(f"Failed to send email alert: {str(e)}")
@@ -308,9 +303,7 @@ class AlertManager:
             response.raise_for_status()
 
             logging.info(
-                f"Slack alert sent successfully ({
-                    'individual' if individual else 'summary'})"
-            )
+                f"Slack alert sent successfully ({'individual' if individual else 'summary'})")
 
         except Exception as e:
             logging.error(f"Failed to send Slack alert: {str(e)}")
@@ -335,9 +328,7 @@ class AlertManager:
             response.raise_for_status()
 
             logging.info(
-                f"Teams alert sent successfully ({
-                    'individual' if individual else 'summary'})"
-            )
+                f"Teams alert sent successfully ({'individual' if individual else 'summary'})")
 
         except Exception as e:
             logging.error(f"Failed to send Teams alert: {str(e)}")
@@ -603,11 +594,7 @@ class AlertManager:
         if level1_failures:
             failures_summary = []
             for failure in level1_failures[:3]:
-                summary_line = f"• **{
-                    failure['model']}.{
-                    failure['test']}**: {
-                    failure['failed_rows']}/{
-                    failure['total_rows']} failed"
+                summary_line = f"• **{failure['model']}.{failure['test']}**: {failure['failed_rows']}/{failure['total_rows']} failed"
                 failures_summary.append(summary_line)
             fields.append(
                 {
@@ -631,9 +618,7 @@ class AlertManager:
 
                 fields.append(
                     {
-                        "title": f"Details: {
-                            failure['model']}.{
-                            failure['test']}",
+                        "title": f"Details: {failure['model']}.{failure['test']}",
                         "value": details,
                         "short": True,
                     }
@@ -943,8 +928,7 @@ class AlertManager:
                     expected = anomaly.get("expected_correlation", "N/A")
                     reason = anomaly.get("reason", "Unknown reason")
                     examples.append(
-                        f"{var_pair}: {
-                            correlation:.3f} (expected: {expected}) - {reason}"
+                        f"{var_pair}: {correlation:.3f} (expected: {expected}) - {reason}"
                     )
 
             # For correlation anomalies - Temporal correlation
@@ -993,8 +977,7 @@ class AlertManager:
                     segment_value = anomaly.get("segment_value", "")
                     change = anomaly.get("concentration_change", 0)
                     examples.append(
-                        f"{segment} ({segment_value}): concentration change = {
-                            change:.3f}"
+                        f"{segment} ({segment_value}): concentration change = {change:.3f}"
                     )
 
             # Generic fallback for any 'anomalies' list in details

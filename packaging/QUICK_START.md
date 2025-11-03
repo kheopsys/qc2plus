@@ -41,9 +41,9 @@ grep -E "(version|VERSION|__version__)" setup.py pyproject.toml packaging/publis
 ./packaging/publish.sh all
 ```
 ## STEP 4: Publish to TestPyPI
-```
+``` bash
 # Upload to TestPyPI
-./packaging/publish.sh testpypi
+./packaging/publish.sh testpypi  
 # Type: yes
 
 # Check on web: https://test.pypi.org/project/qc2plus/1.0.3/

@@ -44,8 +44,7 @@ def retry_on_db_error(max_retries=3, delay=1, backoff=2):
                         wait_time = delay * (backoff**attempt)
                         logging.warning(
                             f"{func.__name__}: DB connection error "
-                            f"(retry {
-                                attempt + 1}/{max_retries} after {wait_time}s): "
+                            f"(retry {attempt + 1}/{max_retries} after {wait_time}s): "
                             f"{type(e).__name__}"
                         )
                         time.sleep(wait_time)
@@ -123,8 +122,7 @@ class PersistenceManager:
             sql = f"""
                 INSERT INTO {self.schema}.quality_run_summary
                 ({columns_str})
-                VALUES ({placeholders})
-            """
+                VALUES ({placeholders}) """
 
             # Execute insert with individual values (not a list)
             # self.connection_manager.execute_sql(
@@ -321,8 +319,7 @@ class PersistenceManager:
         sql = f"""
             INSERT INTO {self.schema}.quality_test_results
             ({columns_str})
-            VALUES ({placeholders})
-        """
+            VALUES ({placeholders}) """
 
         try:
             with self.connection_manager.quality_engine.begin() as conn:
@@ -346,8 +343,7 @@ class PersistenceManager:
         sql = f"""
             INSERT INTO {self.schema}.quality_anomalies
             ({columns_str})
-            VALUES ({placeholders})
-        """
+            VALUES ({placeholders}) """
 
         try:
             with self.connection_manager.quality_engine.begin() as conn:
@@ -518,8 +514,7 @@ class PersistenceManager:
                     status
                 FROM {self.schema}.quality_run_summary
                 WHERE {where_clause}
-                ORDER BY execution_time DESC
-            """
+                ORDER BY execution_time DESC """
 
             # Get test results
             test_results_sql = f"""
@@ -534,8 +529,7 @@ class PersistenceManager:
                 FROM {self.schema}.quality_test_results
                 WHERE {where_clause}
                 GROUP BY model_name, test_type, level, severity, status, execution_time
-                ORDER BY execution_time DESC
-            """
+                ORDER BY execution_time DESC """
 
             # Get anomalies
             anomalies_sql = f"""
@@ -616,8 +610,7 @@ class PersistenceManager:
                         ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
                     ) as rolling_7day_success_rate
                 FROM daily_summary
-                ORDER BY target_environment, date
-            """
+                ORDER BY target_environment, date """
 
             # Adapt for different databases
             if self.connection_manager.db_type == "bigquery":
@@ -648,20 +641,17 @@ class PersistenceManager:
             # Clean up run summaries
             run_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_run_summary
-                WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days'
-            """
+                WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days' """
 
             # Clean up test results
             test_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_test_results
-                WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days'
-            """
+                WHERE execution_time < CURRENT_DATE - INTERVAL '{retention_days} days' """
 
             # Clean up anomalies
             anomaly_cleanup_sql = f"""
                 DELETE FROM {self.schema}.quality_anomalies
-                WHERE detection_time < CURRENT_DATE - INTERVAL '{retention_days} days'
-            """
+                WHERE detection_time < CURRENT_DATE - INTERVAL '{retention_days} days' """
 
             # Adapt for different databases
             if self.connection_manager.db_type == "bigquery":
@@ -792,13 +782,7 @@ class PersistenceManager:
         failure_counts = {}
         for test in test_results:
             if test.get("status") == "failed":
-                test_key = f"{
-                    test.get(
-                        'model_name',
-                        '')}:{
-                    test.get(
-                        'test_type',
-                        '')}"
+                test_key = f"{test.get('model_name','')}:{test.get('test_type','')}"
                 failure_counts[test_key] = failure_counts.get(test_key, 0) + test.get(
                     "test_count", 1
                 )

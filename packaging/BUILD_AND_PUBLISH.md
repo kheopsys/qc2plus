@@ -617,7 +617,7 @@ unzip -l dist/qc2plus-1.0.5-py3-none-any.whl | grep -E "(cli|core|level1|level2|
 - Current stable version: **1.0.5**
 - Python compatibility: **3.9+**
 - License: **MIT**
-- Repository: [kheopsys/qc2plus-internal](https://github.com/kheopsys/qc2plus-internal)
+- Repository: [kheopsys/qc2plus-internal](https://github.com/kheopsys/qc2plus)
 
 ---
 

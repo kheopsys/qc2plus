@@ -18,13 +18,13 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="qc2plus",
-    version="1.0.4",
+    version="1.0.5",
     author="QC2Plus Team",
     author_email="qc2plus@kheopsys.com",
     description="Data Quality Automation Framework with ML-powered anomaly detection",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/kheopsys/qc2plus-internal",
+    url="https://github.com/kheopsys/qc2plus",
     packages=find_packages(exclude=[
     "examples",
     "examples.*",

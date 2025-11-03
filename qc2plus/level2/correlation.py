@@ -186,8 +186,7 @@ class CorrelationAnalyzer:
 
         if non_numeric_vars:
             raise ValueError(
-                f"Non-numeric variables detected: {
-                    ', '.join(non_numeric_vars)}. "
+                f"Non-numeric variables detected: {', '.join(non_numeric_vars)}. "
                 f"Correlation analysis requires only numeric variables. "
                 f"Please exclude or cast them before running the test."
             )
@@ -235,8 +234,7 @@ class CorrelationAnalyzer:
 
                 except Exception as e:
                     logging.warning(
-                        f"Failed to calculate correlation for {var1} vs {var2}: {
-                            str(e)}"
+                        f"Failed to calculate correlation for {var1} vs {var2}: {str(e)}"
                     )
                     continue
 
@@ -256,10 +254,7 @@ class CorrelationAnalyzer:
                     deviation = abs(corr_coef - expected_correlation)
                     if deviation > threshold:
                         anomaly_detected = True
-                        anomaly_reason = f"Correlation {
-                            corr_coef:.3f} deviates from expected {
-                            expected_correlation:.3f} by {
-                            deviation:.3f}"
+                        anomaly_reason = f"Correlation {corr_coef:.3f} deviates from expected {expected_correlation:.3f} by {deviation:.3f}"
 
                 # Check for very weak correlations when strong correlation
                 # expected
@@ -269,15 +264,12 @@ class CorrelationAnalyzer:
                     and abs(corr_coef) < 0.3
                 ):
                     anomaly_detected = True
-                    anomaly_reason = f"Unexpectedly weak correlation {
-                        corr_coef:.3f} (expected {
-                        expected_correlation:.3f})"
+                    anomaly_reason = f"Unexpectedly weak correlation {corr_coef:.3f} (expected {expected_correlation:.3f})"
 
                 # Check for very strong unexpected correlations
                 if not expected_correlation and abs(corr_coef) > 0.7:
                     anomaly_detected = True
-                    anomaly_reason = f"Unexpectedly strong correlation {
-                        corr_coef:.3f}"
+                    anomaly_reason = f"Unexpectedly strong correlation {corr_coef:.3f}"
 
                 if anomaly_detected:
                     results["passed"] = False
@@ -425,8 +417,7 @@ class CorrelationAnalyzer:
                                         "variable_pair": pair_name,
                                         "anomaly_type": "sudden_change",
                                         "recent_change": recent_change,
-                                        "reason": f"Sudden correlation change: {
-                                            recent_change:.3f}",
+                                        "reason": f"Sudden correlation change: {recent_change:.3f}",
                                         "severity": "high",
                                     }
                                 )
@@ -449,8 +440,7 @@ class CorrelationAnalyzer:
                                         "degradation": degradation,
                                         "early_correlation": early_corr,
                                         "recent_correlation": late_corr,
-                                        "reason": f"Correlation degradation: {
-                                            degradation:.3f}",
+                                        "reason": f"Correlation degradation: {degradation:.3f}",
                                         "severity": "high",
                                     }
                                 )
@@ -472,14 +462,12 @@ class CorrelationAnalyzer:
 
         if not static_results["passed"]:
             messages.append(
-                f"Static correlation anomalies: {
-                    static_results['anomalies_count']}"
+                f"Static correlation anomalies: {static_results['anomalies_count']}"
             )
 
         if not temporal_results["passed"]:
             messages.append(
-                f"Temporal correlation anomalies: {
-                    temporal_results['anomalies_count']}"
+                f"Temporal correlation anomalies: {temporal_results['anomalies_count']}"
             )
 
         if not messages:
