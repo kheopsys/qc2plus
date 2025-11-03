@@ -484,7 +484,7 @@ models:
 │         ▼                     ▼             │
 │  ┌────────────────────────────────────┐    │
 │  │      Results Persistence           │    │
-│  │  (PostgreSQL/BigQuery/Snowflake)   │    │
+│  │      (PostgreSQL/BigQuery)         │    │
 │  └────────────────────────────────────┘    │
 │         │                                   │
 │         ├──▶ Power BI Dashboards            │

@@ -68,4 +68,10 @@ models:
             reference_period: 90
             comparison_period: 30   
             date_column: order_date
+        temporal_analysis:
+          date_column: order_date
+          metrics: [count, sum_total_amount]
+          seasonality_check: true
+          window_days: 10   
+          frequency: monthly
 

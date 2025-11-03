@@ -67,6 +67,11 @@ models:
 
 
       level2:
+        correlation_analysis:
+            variables: [lifetime_value, customer_id]
+            expected_correlation: 0.7
+            threshold: 0.3
+            
         distribution_analysis:
             segments: [country]
             metrics: [count, avg_lifetime_value]

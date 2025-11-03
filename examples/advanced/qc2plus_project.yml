@@ -8,11 +8,13 @@ log-path: "logs"
 
 
 alerting:
-  enabled_channels: ["slack", "email"] 
+  enabled_channels: ["slack"] 
   
+
   slack:
-    webhook_url: ${"SLACK_WEBHOOK_URL"}
-    
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+
   email:
     smtp_server: "smtp.gmail.com"      
     smtp_port: 587

@@ -10,13 +10,13 @@ models:
            
         - email_format:
             column_name: email
-            severity: high
+            severity: critical
 
         - range_check:
             column_name: age
             min_value: 18
             max_value: 120
-            severity: medium
+            severity: critical
 
         - not_null:
             column_name: first_name

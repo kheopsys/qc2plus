@@ -51,14 +51,3 @@ models:
             severity: medium
             explanation: "Surveillance quotidienne du NOMBRE de sessions et du TOTAL de pages vues pour détecter les anomalies"
 
-        distribution_analysis:
-            segments: [user_id]
-            metrics: [count, sum_page_views]
-            date_column: session_date
-            reference_period: 7
-            comparison_period: 2
-            behavior_change_threshold: 100
-            severity: medium
-            explanation: "Est-ce que mes utilisateurs se comportent normalement au fil du temps?
-                          Pour chaque utilisateur, surveille : son NOMBRE de sessions et son TOTAL de pages vues"
-
